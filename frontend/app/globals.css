@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+/* Replace @theme inline with @layer base */
+@layer base {
+  html {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #1c1717;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* RTL Support */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .flex {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .text-left {
+  text-align: right;
+}
+
+[dir="rtl"] .text-right {
+  text-align: left;
+}
+
+[dir="rtl"] .ml-auto {
+  margin-left: unset;
+  margin-right: auto;
+}
+
+[dir="rtl"] .mr-auto {
+  margin-right: unset;
+  margin-left: auto;
+}
+
+/* Arabic font support */
+[lang="ar"] {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+[lang="ar"] body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Hide number input spinners (cross-browser) */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Adyen Drop-in Component Styles */
+.adyen-checkout {
+  background: white !important;
+  color: #333 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+.adyen-checkout * {
+  box-sizing: border-box !important;
+}
+
+.adyen-checkout__dropin {
+  background: white !important;
+  min-height: 400px !important;
+  padding: 20px !important;
+  border-radius: 8px !important;
+}
+
+.adyen-checkout__payment-method {
+  background: white !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  margin-bottom: 16px !important;
+  padding: 16px !important;
+}
+
+.adyen-checkout__payment-method--selected {
+  border-color: #2563eb !important;
+}
+
+.adyen-checkout__input {
+  background: white !important;
+  border: 1px solid #d1d5db !important;
+  color: #333 !important;
+  padding: 12px !important;
+  border-radius: 6px !important;
+  font-size: 14px !important;
+}
+
+.adyen-checkout__input:focus {
+  border-color: #2563eb !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+}
+
+.adyen-checkout__button {
+  background: #2563eb !important;
+  color: white !important;
+  border: none !important;
+  padding: 12px 24px !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s !important;
+}
+
+.adyen-checkout__button:hover {
+  background: #1d4ed8 !important;
+}
+
+.adyen-checkout__button:disabled {
+  background: #9ca3af !important;
+  cursor: not-allowed !important;
+}
+
+.adyen-checkout__label {
+  color: #374151 !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  margin-bottom: 6px !important;
+}
+
+.adyen-checkout__field {
+  margin-bottom: 16px !important;
+}
+
+.adyen-checkout__card {
+  background: white !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  padding: 20px !important;
+}
+
+.adyen-checkout__card-number,
+.adyen-checkout__card-exp-date,
+.adyen-checkout__card-cvc {
+  background: white !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 6px !important;
+  padding: 12px !important;
+  color: #333 !important;
+}
+
+/* Error states */
+.adyen-checkout__field--error .adyen-checkout__input {
+  border-color: #dc2626 !important;
+}
+
+.adyen-checkout__error-text {
+  color: #dc2626 !important;
+  font-size: 12px !important;
+  margin-top: 4px !important;
+}
+
+/* Force white background for all Adyen components */
+.adyen-checkout,
+.adyen-checkout *,
+.adyen-checkout__dropin,
+.adyen-checkout__payment-method,
+.adyen-checkout__card,
+.adyen-checkout__input,
+.adyen-checkout__field {
+  background-color: white !important;
+}
+
+/* Ensure text is visible */
+.adyen-checkout,
+.adyen-checkout *,
+.adyen-checkout__label,
+.adyen-checkout__input,
+.adyen-checkout__payment-method {
+  color: #333 !important;
+}
