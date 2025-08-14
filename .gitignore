@@ -216,3 +216,33 @@ local/
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Sensitive configuration files
+*_CONFIG.json
+*_CONFIG.js
+*_CONFIG.ts
+*_config.json
+*_config.js
+*_config.ts
+STRIPE_*.json
+ADYEN_*.json
+PAYMEE_*.json
+KONNECT_*.json
+
+# Large files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.iso
+*.dmg
+*.exe
+*.msi
+
+# Payment gateway credentials
+credentials/
+secrets/
+keys/
+*.pem
+*.key
+*.crt
