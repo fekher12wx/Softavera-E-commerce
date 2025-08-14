@@ -48,7 +48,7 @@ async function setupTaxes() {
     const defaultTaxes = [
       { name: '0%', rate: 0, isActive: true },
       { name: '5%', rate: 5, isActive: true },
-      { name: '10%', rate: 10, isActive: true },
+      { name: '10%', rate: 10, isActive: true, isDefault: true }, // Mark 10% as default
       { name: '15%', rate: 15, isActive: true },
       { name: '20%', rate: 20, isActive: true },
       { name: '25%', rate: 25, isActive: true }

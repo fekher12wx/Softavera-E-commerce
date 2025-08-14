@@ -496,6 +496,13 @@ const AdminDashboard: React.FC = () => {
   
       } else if (activeTab === 'products') {
         // ✅ STEP 1: Create or update product
+        
+        // Validate required fields including tax
+        if (!formData.taxId) {
+          toast.error('Tax selection is required for all products');
+          return;
+        }
+        
         const endpoint = 'products';
         const method = modalType === 'add' ? 'POST' : 'PATCH';
         const url = modalType === 'add'

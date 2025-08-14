@@ -246,3 +246,19 @@ keys/
 *.pem
 *.key
 *.crt
+
+# Payment credential scripts
+populate-payment-credentials.js
+populate-*.js
+*credentials*.js
+*payment*.js
+*api*.js
+*key*.js
+*secret*.js
+
+# Environment and configuration files
+.env.*
+!.env.example
+config/local.js
+config/production.js
+config/staging.js

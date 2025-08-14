@@ -427,9 +427,10 @@ function Modal({
               label={t('tax') || 'Tax'} 
               name="taxId" 
               options={taxes.filter(tax => tax.isActive).map(tax => ({ 
-                              value: tax.id, 
-              label: `${tax.rate}%` 
-            }))} 
+                value: tax.id, 
+                label: `${tax.rate}%` 
+              }))} 
+              required={true}
               disabled={false}
               value={formData.taxId || ''}
               onChange={handleChange}

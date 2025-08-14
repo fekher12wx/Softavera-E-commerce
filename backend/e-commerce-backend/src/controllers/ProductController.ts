@@ -72,6 +72,18 @@
           return;
         }
 
+        // Tax is now mandatory - if no tax is provided, we'll set default 10% tax
+        let finalTaxId = taxId;
+        if (!finalTaxId) {
+          // Get the default 10% tax
+          const defaultTax = await dataService.getTaxByRate(10);
+          if (!defaultTax) {
+            res.status(500).json({ error: 'Default 10% tax not found. Please create it first.' });
+            return;
+          }
+          finalTaxId = defaultTax.id;
+        }
+
         const product = await dataService.createProduct({
           name,
           price,
@@ -82,7 +94,7 @@
           stock: stock ?? 0,
           rating: rating ?? 0,
           reviews: reviews ?? 0,
-          taxId: taxId || null
+          taxId: finalTaxId
         });
 
         res.status(201).json(product);
