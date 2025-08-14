@@ -319,9 +319,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
       <img alt="GitHub stars" src="https://img.shields.io/github/stars/fekher12wx/aures-ecommerce?style=social">
     </a>
     <a href="https://github.com/fekher12wx/aures-ecommerce/network">
-      <img alt="GitHub forks" src="https://img.shields.io/gadge/github/forks/fekher12wx/aures-ecommerce?style=social">
+      <img alt="GitHub forks" src="https://img.shields.io/github/forks/fekher12wx/aures-ecommerce?style=social">
     </a>
-    <a href="https://github.com/yourusernfekher12wxame/aures-ecommerce/issues">
+    <a href="https://github.com/fekher12wx/aures-ecommerce/issues">
       <img alt="GitHub issues" src="https://img.shields.io/github/issues/fekher12wx/aures-ecommerce">
     </a>
   </p>
