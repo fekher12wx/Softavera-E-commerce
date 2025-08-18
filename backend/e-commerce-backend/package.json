@@ -7,10 +7,8 @@
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "test:paymee": "ts-node src/paymee/test-paymee.ts",
-    "setup:taxes": "node setup-taxes.js",
-    "update:old-products-tax": "node update-old-products-tax.js",
     "check:tax-status": "node check-tax-status.js",
-    "force:update-tax": "node force-update-tax.js"
+    "migrate:add-tax-id": "node add-tax-id-column.js"
   },
   "keywords": [],
   "author": "",

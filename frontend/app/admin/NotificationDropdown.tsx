@@ -22,18 +22,13 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ notificatio
             key={n.id + idx}
             className={`px-4 py-3 border-b last:border-b-0 flex items-start gap-3 ${n.read ? 'bg-white' : 'bg-blue-50'}`}
             onClick={() => {
-              console.log('=== Notification clicked ===');
-              console.log('Notification:', n);
-              console.log('Order data:', n.order);
-              console.log('handleView function:', handleView);
+          
               
               setNotifications((prev) => prev.map((notif, i) => i === idx ? { ...notif, read: true } : notif));
               setShowNotifications(false);
               if (n.order) {
-                console.log('Calling handleView with order:', n.order);
                 handleView(n.order);
               } else {
-                console.log('No order data in notification');
               }
             }}
             style={{ cursor: 'pointer' }}

@@ -19,6 +19,9 @@ router.post('/', userController.createUser);
 // PUT /api/users/:id
 router.patch('/:id', userController.updateUser);
 
+// GET /api/users/:id/check-delete
+router.get('/:id/check-delete', userController.checkUserDeletion);
+
 // DELETE /api/users/:id
 router.delete('/:id', userController.deleteUser);
 

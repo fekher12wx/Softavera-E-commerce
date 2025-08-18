@@ -11,31 +11,24 @@ const pool = new Pool({
 
 async function checkTaxStatus() {
   try {
-    console.log('🔍 Checking current tax status in database...\n');
     
     // Check taxes table
-    console.log('📋 Available taxes:');
     const taxes = await pool.query('SELECT id, name, rate, is_active FROM taxes ORDER BY rate');
     taxes.rows.forEach(tax => {
-      console.log(`   - ID: ${tax.id}, Name: ${tax.name}, Rate: ${tax.rate}%, Active: ${tax.is_active}`);
     });
     
-    console.log('\n📦 Products tax status:');
     
     // Check products without tax
     const productsWithoutTax = await pool.query(`
       SELECT COUNT(*) as count FROM products WHERE tax_id IS NULL
     `);
-    console.log(`   - Products without tax: ${productsWithoutTax.rows[0].count}`);
     
     // Check products with tax
     const productsWithTax = await pool.query(`
       SELECT COUNT(*) as count FROM products WHERE tax_id IS NOT NULL
     `);
-    console.log(`   - Products with tax: ${productsWithTax.rows[0].count}`);
     
     // Show tax distribution
-    console.log('\n📊 Tax distribution:');
     const taxDistribution = await pool.query(`
       SELECT 
         t.name as tax_name,
@@ -49,7 +42,6 @@ async function checkTaxStatus() {
     `);
     
     taxDistribution.rows.forEach(stat => {
-      console.log(`   - ${stat.tax_name} (${stat.tax_rate}%): ${stat.product_count} products`);
     });
     
     // Show sample products

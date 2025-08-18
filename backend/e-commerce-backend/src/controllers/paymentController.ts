@@ -23,16 +23,7 @@ const paymentController = {
         return;
       }
 
-      console.log('Creating checkout session with params:', {
-        amount,
-        currency,
-        countryCode,
-        reference,
-        returnUrl,
-        lineItems: lineItems?.length || 0,
-        store
-      });
-
+     
       // Create the session
       const session = await createCheckoutSession({
         amount,
@@ -58,7 +49,6 @@ const paymentController = {
         clientKey
       };
 
-      console.log('Sending response:', JSON.stringify(response, null, 2));
       
       res.status(200).json(response);
     } catch (error) {
@@ -183,15 +173,7 @@ const paymentController = {
       // Generate reference if not provided
       const paymentReference = reference || generatePaymentReference('PAYMEE');
 
-      console.log('Creating Paymee payment with params:', {
-        amount: formattedAmount,
-        note,
-        email,
-        first_name,
-        last_name,
-        reference: paymentReference,
-        returnUrl
-      });
+   
 
       const paymentResponse = await createPaymeePayment({
         amount: formattedAmount,
@@ -225,7 +207,6 @@ const paymentController = {
         return;
       }
 
-      console.log('Checking Paymee payment status for token:', token);
 
       const statusResponse = await checkPaymeePaymentStatus(token);
 
@@ -271,15 +252,7 @@ const paymentController = {
         payment_date 
       } = req.body;
 
-      console.log('Received Paymee webhook:', {
-        token,
-        payment_status,
-        amount,
-        vendor,
-        note,
-        transaction_id,
-        payment_date
-      });
+     
 
       // Validate webhook data
       if (!token || payment_status === undefined) {
@@ -293,7 +266,6 @@ const paymentController = {
 
       if (isPaymentSuccessful) {
         // Payment was successful - update order status
-        console.log(`Payment successful for token: ${token}`);
         
         // TODO: Update order status in database
         // await updateOrderStatus(token, 'paid');
@@ -305,7 +277,6 @@ const paymentController = {
         // await updateInventory(token);
       } else {
         // Payment failed or is pending
-        console.log(`Payment failed or pending for token: ${token}`);
         
         // TODO: Update order status in database
         // await updateOrderStatus(token, 'failed');

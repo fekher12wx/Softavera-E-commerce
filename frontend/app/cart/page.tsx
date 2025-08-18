@@ -126,13 +126,7 @@ const Cart: React.FC = () => {
     }
     
     // Debug logging to help identify price discrepancies
-    console.log('🛒 Cart Price Calculation (Database Tax):', {
-      subtotal: total,
-      calculatedTax: totalTax,
-      subtotalWithTax: total + totalTax,
-      cartContextTotalWithTax: totalWithTax,
-      itemCount: cart.length
-    });
+
     
     // Verify consistency with cart context
     const difference = Math.abs((total + totalTax) - totalWithTax);
@@ -243,27 +237,21 @@ const Cart: React.FC = () => {
   useEffect(() => {
     const fetchActivePaymentMethod = async () => {
       try {
-        console.log('Fetching active payment method...');
         const res = await fetch('http://localhost:3001/api/payment-methods/active');
         const data = await res.json();
-        console.log('Active payment methods response:', data);
         
         if (data && data.length > 0) {
           const activeMethod = data[0]; // Get the first (and only) active method
-          console.log('Active payment method found:', activeMethod);
           
           if (['adyen','paymee','konnect'].includes(activeMethod.code)) {
             setActivePaymentMethod(activeMethod.code);
             setSelectedPaymentMethod(activeMethod.code); // auto-select
-            console.log('Payment method set to:', activeMethod.code);
           } else {
-            console.log('Invalid payment method code:', activeMethod.code);
             setActivePaymentMethod(null);
             setSelectedPaymentMethod(null);
           }
         } else {
           // No active payment method found
-          console.log('No active payment methods found');
           setActivePaymentMethod(null);
           setSelectedPaymentMethod(null);
         }
@@ -399,11 +387,7 @@ const Cart: React.FC = () => {
   const createOrderAfterPayment = async () => {
     try {
       let userIdToUse = user?.id;
-      console.log('user:', user);
-      console.log('userIdToUse:', userIdToUse);
-      console.log('isLoggedIn:', isLoggedIn);
-      console.log('shippingAddress:', shippingAddress);
-      console.log('cart:', cart);
+  
 
       if (!isLoggedIn) {
         const guest = generateGuestCredentials();
@@ -424,7 +408,6 @@ const Cart: React.FC = () => {
         }
         const userData = await userRes.json();
         userIdToUse = userData.user?.id;
-        console.log('Created guest user, userIdToUse:', userIdToUse);
       }
 
       const orderPayload = {
@@ -440,7 +423,6 @@ const Cart: React.FC = () => {
         shippingAddress,
         status: 'shipped' // Set status to shipped after payment
       };
-      console.log('orderPayload:', orderPayload);
 
       const res = await fetch('http://localhost:3001/api/orders', {
         method: 'POST',
@@ -826,7 +808,6 @@ if (cart.length === 0) {
                                     onError: () => setPaymentStatus('error'),
                                     onCancel: () => setSelectedPaymentMethod(null),
                                   };
-                                  console.log('PaymeePayment values:', paymeeProps);
                                   return <PaymeePayment {...paymeeProps} />;
                                 })()}
                               </div>

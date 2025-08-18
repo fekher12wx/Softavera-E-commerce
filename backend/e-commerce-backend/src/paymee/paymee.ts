@@ -114,7 +114,6 @@ export async function createPaymeePayment(params: CreatePaymeePaymentParams): Pr
       paymentData.redirect_url = returnUrl;
     }
 
-    console.log('Creating Paymee payment with data:', paymentData);
 
     // Create axios instance with configuration
     const paymeeClient = axios.create({
@@ -144,7 +143,6 @@ export async function createPaymeePayment(params: CreatePaymeePaymentParams): Pr
       }
     };
 
-    console.log('Paymee payment created successfully:', paymentResponse);
     return paymentResponse;
 
   } catch (error: any) {
@@ -187,7 +185,6 @@ export async function checkPaymeePaymentStatus(token: string): Promise<PaymeeSta
       throw new Error('Payment token is required');
     }
 
-    console.log('Checking Paymee payment status for token:', token);
 
     // Create axios instance with configuration
     const paymeeClient = axios.create({
@@ -224,7 +221,6 @@ export async function checkPaymeePaymentStatus(token: string): Promise<PaymeeSta
           }
         };
 
-        console.log('Paymee payment status checked:', statusResponse);
         return statusResponse;
         
       } catch (error: any) {
@@ -232,7 +228,6 @@ export async function checkPaymeePaymentStatus(token: string): Promise<PaymeeSta
         
         // Check if it's a DNS error
         if (error.code === 'ENOTFOUND' || error.message.includes('getaddrinfo ENOTFOUND')) {
-          console.log(`DNS resolution failed (attempt ${attempt}/${maxRetries}), retrying in 2 seconds...`);
           if (attempt < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, 2000));
             continue;

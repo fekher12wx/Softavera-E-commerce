@@ -17,6 +17,7 @@ router.get('/:id', productController.getProductById);
 
 
 
+
 // POST /api/products
 router.post('/', productController.createProduct);
 router.post('/:id/image', upload.single('image'), productController.uploadProductImage);

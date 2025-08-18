@@ -67,18 +67,15 @@ export async function createCheckoutSession({
       shopperInteraction: Types.checkout.CreateCheckoutSessionRequest.ShopperInteractionEnum.Ecommerce // Use enum value
     };
 
-    console.log('Creating session with request:', JSON.stringify(sessionRequest, null, 2));
 
     const session = await checkout.PaymentsApi.sessions(sessionRequest, { 
       idempotencyKey: uuidv4() 
     });
     
-    console.log('Session created successfully:', JSON.stringify(session, null, 2));
     
     return session;
   } catch (err: any) {
-    console.error(`Adyen session creation error: ${err.message}, error code: ${err.errorCode}`);
-    console.error('Full error:', err);
+   
     throw err;
   }
 }
@@ -125,10 +122,8 @@ export async function getPaymentMethods({
     };
 
     const paymentMethods = await checkout.PaymentsApi.paymentMethods(paymentMethodsRequest);
-    console.log('Payment methods fetched:', JSON.stringify(paymentMethods, null, 2));
     return paymentMethods;
   } catch (err: any) {
-    console.error(`Error fetching payment methods: ${err.message}, error code: ${err.errorCode}`);
     throw err;
   }
 }

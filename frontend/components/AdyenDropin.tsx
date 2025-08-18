@@ -49,7 +49,6 @@ const AdyenDropin: React.FC<AdyenDropinProps> = ({
     let dropinInstance: any;
 
     function handleOnPaymentCompleted(result: any, component: any) {
-      console.log('Payment completed:', result);
       const { resultCode, merchantReference } = result;
       
       switch (resultCode) {

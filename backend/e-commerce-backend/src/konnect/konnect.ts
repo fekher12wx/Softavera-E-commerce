@@ -41,7 +41,6 @@ export async function createKonnectPayment(params: CreateKonnectPaymentParams): 
                              config.merchantId === '';
 
     if (shouldUseDemoMode) {
-      console.log('🎭 Konnect: Using demo mode due to incomplete configuration');
       
       // Generate demo payment
             const { amount, email, first_name, last_name, note, reference } = params;
@@ -50,7 +49,6 @@ export async function createKonnectPayment(params: CreateKonnectPaymentParams): 
     
       const fakePaymentUrl = `https://pay.konnect.local/checkout/${token}`;
     
-      console.log(`🎭 Konnect Demo Mode: Created payment with token ${token} for amount ${amount}`);
     
       return {
         success: true,
@@ -128,7 +126,6 @@ export async function createKonnectPayment(params: CreateKonnectPaymentParams): 
       } catch (apiError: any) {
         console.error('Konnect API error:', apiError);
         // Fall back to demo mode if API fails
-        console.log('🔄 Konnect: Falling back to demo mode due to API error');
       }
     }
 
@@ -166,9 +163,7 @@ export async function checkKonnectPaymentStatus(token: string): Promise<{ succes
     
     // Log configuration status for debugging
     if (config) {
-      console.log(`🔧 Konnect Config: baseUrl=${config.baseUrl}, hasApiKey=${!!config.apiKey}, apiKeyValid=${config.apiKey !== 'your-konnect-api-key'}`);
     } else {
-      console.log('⚠️ Konnect Config: No configuration found, using demo mode');
     }
     
     // If we have a real Konnect API configuration AND it's not a demo token, use it
@@ -201,9 +196,7 @@ export async function checkKonnectPaymentStatus(token: string): Promise<{ succes
     const current = tokenStatusMap.get(token) || 'pending';
     if (current === 'pending') {
       tokenStatusMap.set(token, 'paid');
-      console.log(`🎭 Konnect Demo Mode: Payment ${token} status changed from pending to paid`);
     } else {
-      console.log(`🎭 Konnect Demo Mode: Payment ${token} status is ${current}`);
     }
     
     return { 
@@ -224,29 +217,24 @@ export async function validateKonnectConfig(): Promise<boolean> {
   try {
     const config = await paymentConfigService.getProviderConfig('konnect');
     if (!config) {
-      console.log('⚠️ Konnect: No configuration found');
       return false;
     }
 
     // Check if we have a valid API key (not placeholder)
     if (!config.apiKey || config.apiKey === '' || config.apiKey === 'your-konnect-api-key') {
-      console.log('⚠️ Konnect: API key not configured or is placeholder');
       return false;
     }
 
     // Check if we have a valid merchant ID
     if (!config.merchantId || config.merchantId === '') {
-      console.log('⚠️ Konnect: Merchant ID not configured');
       return false;
     }
 
     // Check if we have a valid base URL
     if (!config.baseUrl || config.baseUrl === '') {
-      console.log('⚠️ Konnect: Base URL not configured');
       return false;
     }
 
-    console.log('✅ Konnect: Configuration is valid');
     return true;
   } catch (error) {
     console.error('❌ Error validating Konnect config:', error);

@@ -30,18 +30,14 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
         const res = await fetch(`http://localhost:3001/api/orders?userId=${user.id}`);
         if (!res.ok) return;
         const orders: Order[] = await res.json();
-        console.log('Fetched orders:', orders);
         let purchased = false;
         orders.forEach(order => {
-          console.log('Order status:', order.status);
           order.items.forEach(item => {
-            console.log('Order item product id:', item.product.id, 'Current product id:', product.id);
             if ((order.status === 'delivered' || order.status === 'shipped' || order.status === 'processing') && item.product.id === product.id) {
               purchased = true;
             }
           });
         });
-        console.log('Has purchased this product:', purchased);
         setHasPurchased(purchased);
       } catch (e) {
         setHasPurchased(false);

@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_methods_active ON payment_methods(is_acti
 
 -- Insert default payment methods if they don't exist
 INSERT INTO payment_methods (name, code, description, is_active, config) VALUES
-    ('Adyen', 'adyen', 'Global payment platform supporting multiple payment methods', false, '{"apiKey": "", "merchantAccount": "", "environment": "test", "webhookUrl": ""}')
+    ('Adyen', 'adyen', 'Global payment platform supporting multiple payment methods', true, '{"apiKey": "", "merchantAccount": "", "environment": "test", "webhookUrl": ""}')
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO payment_methods (name, code, description, is_active, config) VALUES
@@ -28,6 +28,9 @@ ON CONFLICT (code) DO NOTHING;
 INSERT INTO payment_methods (name, code, description, is_active, config) VALUES
     ('Konnect', 'konnect', 'Tunisian digital payment network', false, '{"apiKey": "", "merchantId": "", "baseUrl": "https://api.konnect.network", "environment": "test", "webhookUrl": ""}')
 ON CONFLICT (code) DO NOTHING;
+
+-- Ensure only Adyen is active (deactivate all others)
+UPDATE payment_methods SET is_active = false WHERE code != 'adyen';
 
 -- Grant permissions (adjust as needed for your database setup)
 -- GRANT ALL PRIVILEGES ON TABLE payment_methods TO your_user;

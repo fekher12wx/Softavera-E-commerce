@@ -9,10 +9,35 @@ interface UsersTableProps {
   handleView: (user: User) => void;
   handleEdit: (user: User) => void;
   handleDelete: (id: string) => void;
+  canDeleteUser?: (userId: string) => Promise<{ canDelete: boolean; reason?: string }>;
 }
 
-const UsersTable: React.FC<UsersTableProps> = ({ users, searchTerm, handleView, handleEdit, handleDelete }) => {
+const UsersTable: React.FC<UsersTableProps> = ({ users, searchTerm, handleView, handleEdit, handleDelete, canDeleteUser }) => {
   const { t } = useLanguage();
+  const [userDeleteStatus, setUserDeleteStatus] = React.useState<Record<string, { canDelete: boolean; reason?: string }>>({});
+  
+  // Check delete status for all users when component mounts or users change
+  React.useEffect(() => {
+    if (!canDeleteUser) return;
+    
+    const checkAllUsers = async () => {
+      const statusMap: Record<string, { canDelete: boolean; reason?: string }> = {};
+      
+      for (const user of users) {
+        try {
+          const status = await canDeleteUser(user.id);
+          statusMap[user.id] = status;
+        } catch (error) {
+          console.error(`Error checking delete status for user ${user.id}:`, error);
+          statusMap[user.id] = { canDelete: true }; // Default to allowing deletion
+        }
+      }
+      
+      setUserDeleteStatus(statusMap);
+    };
+    
+    checkAllUsers();
+  }, [users, canDeleteUser]);
   
   return (
     <div className="space-y-6">
@@ -152,13 +177,33 @@ const UsersTable: React.FC<UsersTableProps> = ({ users, searchTerm, handleView, 
                         >
                           <Edit className="w-4 h-4 text-amber-600 group-hover/btn:text-amber-700" />
                         </button>
-                        <button
-                          onClick={() => handleDelete?.(user.id)}
-                          className="group/btn p-2 hover:bg-rose-50 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95"
-                          title={t('delete_user')}
-                        >
-                          <Trash2 className="w-4 h-4 text-rose-600 group-hover/btn:text-rose-700" />
-                        </button>
+                        {(() => {
+                          const deleteStatus = userDeleteStatus[user.id];
+                          const canDelete = deleteStatus?.canDelete ?? true;
+                          const reason = deleteStatus?.reason;
+                          
+                          if (canDelete) {
+                            return (
+                              <button
+                                onClick={() => handleDelete?.(user.id)}
+                                className="group/btn p-2 hover:bg-rose-50 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95"
+                                title={t('delete_user')}
+                              >
+                                <Trash2 className="w-4 h-4 text-rose-600 group-hover/btn:text-rose-700" />
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <button
+                                disabled
+                                className="group/btn p-2 bg-gray-100 rounded-lg cursor-not-allowed opacity-50"
+                                title={reason || 'Cannot delete user'}
+                              >
+                                <Trash2 className="w-4 h-4 text-gray-400" />
+                              </button>
+                            );
+                          }
+                        })()}
                       </div>
                     </td>
                   </tr>

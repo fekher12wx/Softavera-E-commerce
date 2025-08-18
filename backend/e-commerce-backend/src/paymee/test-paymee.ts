@@ -15,29 +15,21 @@ dotenv.config();
  * This script tests the basic functionality of the Paymee service
  */
 async function testPaymeeIntegration() {
-  console.log('🧪 Starting Paymee Integration Tests...\n');
 
   try {
     // Test 1: Validate configuration
-    console.log('1️⃣ Testing Paymee configuration...');
     const isConfigValid = await validatePaymeeConfig();
     if (isConfigValid) {
-      console.log('✅ Paymee configuration is valid\n');
     } else {
-      console.log('❌ Paymee configuration is invalid\n');
       return;
     }
 
     // Test 2: Test utility functions
-    console.log('2️⃣ Testing utility functions...');
     const reference = generatePaymentReference('TEST');
-    console.log(`✅ Generated reference: ${reference}`);
     
     const formattedAmount = formatPaymeeAmount(45.99);
-    console.log(`✅ Formatted amount: ${formattedAmount}\n`);
 
     // Test 3: Create a test payment
-    console.log('3️⃣ Testing payment creation...');
     const paymentParams = {
       amount: 45,
       note: `Test payment - ${new Date().toISOString()}`,
@@ -47,27 +39,18 @@ async function testPaymeeIntegration() {
       last_name: 'Doe'
     };
 
-    console.log('Payment parameters:', paymentParams);
     
     const paymentResponse = await createPaymeePayment(paymentParams);
     
     if (paymentResponse.success && paymentResponse.data.token) {
-      console.log('✅ Payment created successfully!');
-      console.log(`   Token: ${paymentResponse.data.token}`);
-      console.log(`   Payment URL: ${paymentResponse.data.payment_url}`);
-      console.log(`   Amount: ${paymentResponse.data.amount}`);
-      console.log(`   Status: ${paymentResponse.data.status}\n`);
+ 
 
       // Test 4: Check payment status
       console.log('4️⃣ Testing payment status check...');
       const statusResponse = await checkPaymeePaymentStatus(paymentResponse.data.token);
       
       if (statusResponse.success) {
-        console.log('✅ Payment status checked successfully!');
-        console.log(`   Token: ${statusResponse.data.token}`);
-        console.log(`   Payment Status: ${statusResponse.data.payment_status ? 'PAID' : 'PENDING'}`);
-        console.log(`   Amount: ${statusResponse.data.amount}`);
-        console.log(`   Note: ${statusResponse.data.note}`);
+    
         if (statusResponse.data.transaction_id) {
           console.log(`   Transaction ID: ${statusResponse.data.transaction_id}`);
         }

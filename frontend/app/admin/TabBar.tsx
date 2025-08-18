@@ -1,96 +1,155 @@
 import React from 'react';
-import { Users, Package, ShoppingCart, Plus, DollarSign, Percent, CreditCard, Settings } from 'lucide-react';
-import { TabType, User, Product, Order, Tax, PaymentMethod } from './adminTypes';
-import { useLanguage } from '../../lib/languageContext';
+import { Users, Package, ShoppingCart, Plus, DollarSign, Percent, CreditCard, Settings, Coins, ChevronDown } from 'lucide-react';
+
+// Mock types for demonstration
+type TabType = 'users' | 'products' | 'orders' | 'taxes' | 'paymentMethods' | 'currency' | 'invoiceSettings';
 
 interface TabBarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
-  users: User[];
-  products: Product[];
-  orders: Order[];
-  taxes: Tax[];
-  paymentMethods: PaymentMethod[];
+  users?: any[];
+  products?: any[];
+  orders?: any[];
+  taxes?: any[];
+  paymentMethods?: any[];
+  currencies?: any[];
   onAddNew: () => void;
 }
 
-const TabBar = ({ activeTab, setActiveTab, users, products, orders, taxes, paymentMethods, onAddNew }: TabBarProps) => {
-  const { t } = useLanguage();
+const TabBar = ({ 
+  activeTab, 
+  setActiveTab, 
+  users = [], 
+  products = [], 
+  orders = [], 
+  taxes = [], 
+  paymentMethods = [], 
+  currencies = [], 
+  onAddNew 
+}: TabBarProps) => {
   
-  const tabs: TabType[] = ['users', 'products', 'orders', 'taxes', 'paymentMethods'];
+  const tabs: TabType[] = ['users', 'products', 'orders', 'taxes', 'paymentMethods', 'currency', 'invoiceSettings'];
 
-  const getTabLabel = (tab: TabType) => {
-    switch (tab) {
-      case 'users': return t('users');
-      case 'products': return t('products');
-      case 'orders': return t('orders');
-      case 'taxes': return t('taxes');
-      case 'paymentMethods': return t('payment_methods') || 'Payment Methods';
-
-      default: return tab;
-    }
-  };
-
-  const getTabIcon = (tab: TabType) => {
-    switch (tab) {
-      case 'users': return <Users className="w-5 h-5" />;
-      case 'products': return <Package className="w-5 h-5" />;
-      case 'orders': return <ShoppingCart className="w-5 h-5" />;
-      case 'taxes': return <DollarSign className="w-5 h-5" />;
-      case 'paymentMethods': return <CreditCard className="w-5 h-5" />;
-
-      default: return <div className="w-5 h-5" />;
-    }
-  };
-
-  const getTabCount = (tab: TabType) => {
-    switch (tab) {
-      case 'users': return users.length;
-      case 'products': return products.length;
-      case 'orders': return orders.length;
-      case 'taxes': return taxes.length;
-      case 'paymentMethods': return paymentMethods.length;
-
-      default: return undefined;
-    }
+  const getTabConfig = (tab: TabType) => {
+    const configs = {
+      users: { 
+        label: 'Users', 
+        icon: Users, 
+        count: users.length, 
+        color: 'from-blue-500 to-cyan-500',
+        lightColor: 'from-blue-50 to-cyan-50',
+        textColor: 'text-blue-600'
+      },
+      products: { 
+        label: 'Products', 
+        icon: Package, 
+        count: products.length,
+        color: 'from-green-500 to-emerald-500',
+        lightColor: 'from-green-50 to-emerald-50',
+        textColor: 'text-green-600'
+      },
+      orders: { 
+        label: 'Orders', 
+        icon: ShoppingCart, 
+        count: orders.length,
+        color: 'from-orange-500 to-amber-500',
+        lightColor: 'from-orange-50 to-amber-50',
+        textColor: 'text-orange-600'
+      },
+      taxes: { 
+        label: 'Taxes', 
+        icon: Percent, 
+        count: taxes.length,
+        color: 'from-red-500 to-rose-500',
+        lightColor: 'from-red-50 to-rose-50',
+        textColor: 'text-red-600'
+      },
+      paymentMethods: { 
+        label: 'Payment Methods', 
+        icon: CreditCard, 
+        count: paymentMethods.length,
+        color: 'from-purple-500 to-violet-500',
+        lightColor: 'from-purple-50 to-violet-50',
+        textColor: 'text-purple-600'
+      },
+      currency: { 
+        label: 'Currencies', 
+        icon: Coins, 
+        count: currencies.length,
+        color: 'from-yellow-500 to-orange-500',
+        lightColor: 'from-yellow-50 to-orange-50',
+        textColor: 'text-yellow-600'
+      },
+      invoiceSettings: { 
+        label: 'Invoice Settings', 
+        icon: Settings, 
+        count: undefined,
+        color: 'from-slate-500 to-gray-500',
+        lightColor: 'from-slate-50 to-gray-50',
+        textColor: 'text-slate-600'
+      }
+    };
+    return configs[tab];
   };
 
   return (
-    <div className="mb-8 flex items-center justify-between">
-      <div className="flex rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
+    <div className="flex items-center justify-between mb-6">
+      {/* Compact Tab Navigation */}
+      <div className="flex bg-white/95 backdrop-blur-lg rounded-xl p-1 shadow-lg border border-slate-200/50">
         {tabs.map((tab) => {
-          const count = getTabCount(tab);
+          const config = getTabConfig(tab);
+          const Icon = config.icon;
+          const isActive = activeTab === tab;
+          
           return (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                activeTab === tab
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+              className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all duration-200 ${
+                isActive
+                  ? `bg-gradient-to-r ${config.color} text-white shadow-md`
+                  : `text-slate-600 hover:bg-slate-50 hover:${config.textColor}`
               }`}
             >
-              {getTabIcon(tab)}
-              <span>{getTabLabel(tab)}</span>
-              {count !== undefined && (
-                <span className="rounded-full bg-white/20 px-2 py-1 text-xs">
-                  {count}
-                </span>
+              <div className={`p-1 rounded-md transition-all duration-200 ${
+                isActive 
+                  ? 'bg-white/20' 
+                  : 'bg-slate-100/50 group-hover:bg-white/70'
+              }`}>
+                <Icon className="h-3.5 w-3.5" />
+              </div>
+              
+              <span className="text-sm font-semibold whitespace-nowrap">{config.label}</span>
+              
+              {config.count !== undefined && (
+                <div className={`px-2 py-0.5 rounded-full text-xs font-bold transition-all duration-200 ${
+                  isActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-200/70 text-slate-600 group-hover:bg-white/90'
+                }`}>
+                  {config.count}
+                </div>
               )}
             </button>
           );
         })}
       </div>
       
+      {/* Compact Add Button */}
       <button
         onClick={onAddNew}
-        className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+        className="group relative overflow-hidden px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
       >
-        <Plus className="h-4 w-4" />
-        <span>{t('add_new')}</span>
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="relative flex items-center gap-2">
+          <div className="p-1 bg-white/20 rounded-md group-hover:rotate-90 transition-transform duration-200">
+            <Plus className="h-3.5 w-3.5" />
+          </div>
+          <span className="text-sm font-semibold">Add New</span>
+        </div>
       </button>
     </div>
   );
 };
 
-export default TabBar; 
+export default TabBar;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Edit, Trash2, CreditCard, CheckCircle, XCircle, Settings, Globe, Shield } from 'lucide-react';
+import { Eye, Edit, Trash2, CreditCard, CheckCircle, XCircle, Settings, Globe, Shield, Plus, Search } from 'lucide-react';
 import { PaymentMethod } from './adminTypes';
 import { useLanguage } from '../../lib/languageContext';
 
@@ -10,6 +10,8 @@ interface PaymentMethodsTableProps {
   handleEdit: (paymentMethod: PaymentMethod) => void;
   handleDelete: (id: string) => void;
   handleToggleStatus: (paymentMethod: PaymentMethod) => void;
+  onAddNew?: () => void;
+  handleClearConfig?: (id: string) => void;
 }
 
 const PaymentMethodsTable: React.FC<PaymentMethodsTableProps> = ({
@@ -19,9 +21,12 @@ const PaymentMethodsTable: React.FC<PaymentMethodsTableProps> = ({
   handleEdit,
   handleDelete,
   handleToggleStatus,
+  onAddNew,
+  handleClearConfig,
 }) => {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<string>('');
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
+  const [expandedMethod, setExpandedMethod] = useState<string | null>(null);
 
   // Safety check - ensure paymentMethods is always an array
   const safePaymentMethods = Array.isArray(paymentMethods) ? paymentMethods : [];
@@ -32,18 +37,26 @@ const PaymentMethodsTable: React.FC<PaymentMethodsTableProps> = ({
     paymentMethod.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Set default active tab if none selected
-  React.useEffect(() => {
-    if (filteredPaymentMethods.length > 0 && !activeTab) {
-      setActiveTab(filteredPaymentMethods[0].code);
+  // Get the currently selected method with latest data
+  const selectedMethod = React.useMemo(() => {
+    if (!selectedMethodId || filteredPaymentMethods.length === 0) {
+      return filteredPaymentMethods[0] || null;
     }
-  }, [filteredPaymentMethods, activeTab]);
+    return filteredPaymentMethods.find(m => m.id === selectedMethodId) || filteredPaymentMethods[0] || null;
+  }, [selectedMethodId, filteredPaymentMethods]);
 
-  const getActivePaymentMethod = (): PaymentMethod | undefined => {
-    return filteredPaymentMethods.find(pm => pm.code === activeTab);
+  // Set default selected method ID if none selected
+  React.useEffect(() => {
+    if (filteredPaymentMethods.length > 0 && !selectedMethodId) {
+      setSelectedMethodId(filteredPaymentMethods[0].id);
+    }
+  }, [filteredPaymentMethods, selectedMethodId]);
+
+  const toggleMethod = (methodId: string) => {
+    setExpandedMethod(prev => (prev === methodId ? null : methodId));
   };
 
-  const getTabIcon = (code: string) => {
+  const getIcon = (code: string) => {
     switch (code.toLowerCase()) {
       case 'adyen':
         return <Globe className="w-5 h-5" />;
@@ -56,210 +69,285 @@ const PaymentMethodsTable: React.FC<PaymentMethodsTableProps> = ({
     }
   };
 
-  const getTabColor = (code: string): string => {
-    switch (code.toLowerCase()) {
-      case 'adyen':
-        return 'from-blue-500 to-indigo-600';
-      case 'paymee':
-        return 'from-green-500 to-emerald-600';
-      case 'konnect':
-        return 'from-purple-500 to-pink-600';
-      default:
-        return 'from-gray-500 to-slate-600';
-    }
-  };
-
-  const renderConfigurationCard = (paymentMethod: PaymentMethod) => {
-    const config = paymentMethod.config || {};
-    
-    return (
-      <div className="space-y-6">
-        {/* Basic Information */}
-        <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200">
-            Basic Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">Name</label>
-              <p className="text-lg font-medium text-gray-900">{paymentMethod.name}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">Code</label>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                {paymentMethod.code}
-              </span>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-600 mb-1">Description</label>
-              <p className="text-gray-700">{paymentMethod.description || 'No description'}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">Status</label>
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                  paymentMethod.isActive
-                    ? 'bg-green-100 text-green-800 border border-green-200'
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}
-              >
-                {paymentMethod.isActive ? (
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                ) : (
-                  <XCircle className="w-4 h-4 mr-2" />
-                )}
-                {paymentMethod.isActive ? 'Active' : 'Inactive'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Configuration Details */}
-        <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200">
-            Configuration
-          </h3>
-          
-          {Object.keys(config).length === 0 ? (
-            <div className="text-center py-8">
-              <Settings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No configuration set</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {Object.entries(config).map(([key, value]) => (
-                <div key={key}>
-                  <label className="block text-sm font-semibold text-gray-600 mb-2 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </label>
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                    {typeof value === 'object' ? (
-                      <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                        {JSON.stringify(value, null, 2)}
-                      </pre>
-                    ) : (
-                      <p className="text-gray-700 font-mono text-sm break-all">
-                        {String(value)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="bg-gradient-to-br from-white to-gray-50/50 rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200">
-            Actions
-          </h3>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => handleToggleStatus(paymentMethod)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-200 ${
-                paymentMethod.isActive
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-green-600 text-white hover:bg-green-700'
-              }`}
-              title={paymentMethod.isActive ? 'Deactivate (will activate another method)' : 'Activate (will deactivate others)'}
-            >
-              {paymentMethod.isActive ? (
-                <>
-                  <XCircle className="w-4 h-4" />
-                  <span>Deactivate</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Activate</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => handleEdit(paymentMethod)}
-              className="flex items-center space-x-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors duration-200"
-            >
-              <Edit className="w-4 h-4" />
-              <span>Edit Configuration</span>
-            </button>
-            <button
-              onClick={() => handleView(paymentMethod)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-            >
-              <Eye className="w-4 h-4" />
-              <span>View Details</span>
-            </button>
-            <button
-              onClick={() => handleDelete(paymentMethod.id)}
-              className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Delete</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-100">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
-              <CreditCard className="w-5 h-5 text-white" />
-            </div>
+      <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex justify-between items-center">
             <div>
-              <h3 className="text-xl font-bold text-gray-900">Payment Methods</h3>
-              <p className="text-sm text-gray-600">{filteredPaymentMethods.length} total methods</p>
-              <p className="text-xs text-blue-600 mt-1">💡 Only one payment method can be active at a time</p>
+              <h1 className="text-2xl font-bold text-white">Payment Methods</h1>
+              <p className="text-purple-100 mt-1">Configure and manage payment gateways</p>
+            </div>
+            <button 
+              onClick={onAddNew}
+              className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Add Method
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-12 gap-6">
+          
+          {/* Left Sidebar - Methods List */}
+          <div className="col-span-12 lg:col-span-4">
+            <div className="bg-gradient-to-b from-white to-gray-50 rounded-xl shadow-lg border border-gray-200 sticky top-8">
+              
+             
+
+              {/* Methods List */}
+              <div className="divide-y divide-gray-100">
+                {filteredPaymentMethods.map((method) => (
+                  <div key={method.id} className="group">
+                    <button
+                                             onClick={() => {
+                         toggleMethod(method.id);
+                         setSelectedMethodId(method.id);
+                       }}
+                      className={`w-full flex items-center justify-between px-5 py-4 transition-all duration-300 ${
+                        expandedMethod === method.id
+                          ? 'bg-purple-50 border-l-4 border-purple-400 shadow-inner'
+                          : selectedMethod?.id === method.id
+                          ? 'bg-blue-50 border-l-4 border-blue-400'
+                          : 'hover:bg-purple-50/40'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-sm ${
+                          method.isActive
+                            ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-600'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {getIcon(method.code)}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-800">{method.name}</p>
+                          <p className="text-xs text-gray-500">{method.code.toUpperCase()}</p>
+                          {method.isActive && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 mt-1">
+                              <CheckCircle className="w-2.5 h-2.5" />
+                              Active
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <svg
+                        className={`w-4 h-4 transform transition-transform duration-300 ${
+                          expandedMethod === method.id ? 'rotate-180' : ''
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Expanded Actions */}
+                    <div
+                      className={`overflow-hidden transition-all duration-500 ${
+                        expandedMethod === method.id ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'
+                      }`}
+                    >
+                      <div className="bg-white/60 backdrop-blur-sm p-4 border-t border-gray-200">
+                        <div className="space-y-3">
+                          <button
+                            onClick={() => handleToggleStatus(method)}
+                            className="w-full px-4 py-2 flex items-center gap-3 bg-white border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                            </div>
+                            <span className="text-sm font-medium">
+                              {method.isActive ? 'Deactivate' : 'Activate & Deactivate Others'}
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={() => handleEdit(method)}
+                            className="w-full px-4 py-2 flex items-center gap-3 bg-white border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-300 hover:bg-purple-50 transition-all"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                              <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                            </div>
+                            <span className="text-sm font-medium">Edit Configuration</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <div className="flex space-x-1 px-6 py-2 overflow-x-auto">
-          {filteredPaymentMethods.map((paymentMethod) => (
-            <button
-              key={paymentMethod.code}
-              onClick={() => setActiveTab(paymentMethod.code)}
-              className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-200 whitespace-nowrap ${
-                activeTab === paymentMethod.code
-                  ? `bg-gradient-to-r ${getTabColor(paymentMethod.code)} text-white shadow-lg`
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              {getTabIcon(paymentMethod.code)}
-              <span>{paymentMethod.name}</span>
-              {paymentMethod.isActive ? (
-                <span className="w-2 h-2 bg-green-400 rounded-full" title="Active"></span>
-              ) : (
-                <span className="w-2 h-2 bg-red-400 rounded-full" title="Inactive"></span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+          {/* Right Content - Method Details */}
+          <div className="col-span-12 lg:col-span-8">
+            {selectedMethod && (
+              <div className="space-y-6">
+                
+                {/* Method Header */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
+                        selectedMethod.isActive 
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' 
+                          : 'bg-gray-200 text-gray-500'
+                      }`}>
+                        {React.cloneElement(getIcon(selectedMethod.code), { className: "w-8 h-8" })}
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-gray-900">{selectedMethod.name}</h2>
+                        <p className="text-gray-600 mt-1">{selectedMethod.description}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                            selectedMethod.isActive 
+                              ? 'bg-green-100 text-green-700' 
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {selectedMethod.isActive ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                            {selectedMethod.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                          {selectedMethod.isActive && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              <CheckCircle className="w-3 h-3" />
+                              Only Active Method
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                     
+                       <button 
+                         onClick={() => handleEdit(selectedMethod)}
+                         className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                       >
+                         <Edit className="w-4 h-4" />
+                       </button>
+                                               <button 
+                          onClick={() => handleClearConfig ? handleClearConfig(selectedMethod.id) : handleDelete(selectedMethod.id)}
+                          className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Clear Configuration"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                     </div>
+                   </div>
+                 </div>
 
-      {/* Tab Content */}
-      <div className="p-6">
-        {activeTab && getActivePaymentMethod() ? (
-          renderConfigurationCard(getActivePaymentMethod()!)
-        ) : (
-          <div className="text-center py-12">
-            <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Payment Methods</h3>
-            <p className="text-gray-500">Add your first payment method to get started</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+                 {/* Basic Information */}
+                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                       <p className="text-gray-900">{selectedMethod.name}</p>
+                     </div>
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                       <span className="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                         {selectedMethod.code}
+                       </span>
+                     </div>
+                     <div className="md:col-span-2">
+                       <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                       <p className="text-gray-900">{selectedMethod.description || 'No description'}</p>
+                     </div>
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-medium ${
+                         selectedMethod.isActive
+                           ? 'bg-green-100 text-green-800'
+                           : 'bg-red-100 text-red-800'
+                       }`}>
+                         {selectedMethod.isActive ? 'Active' : 'Inactive'}
+                       </span>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Configuration */}
+                 <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                   <div className="p-6 border-b border-gray-200">
+                     <div className="flex items-center gap-2">
+                       <Settings className="w-5 h-5 text-gray-500" />
+                       <h3 className="text-lg font-semibold text-gray-900">Configuration</h3>
+                     </div>
+                   </div>
+                   
+                   <div className="p-6">
+                     {Object.keys(selectedMethod.config || {}).length === 0 ? (
+                       <div className="text-center py-8">
+                         <Settings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                         <p className="text-gray-500">No configuration set</p>
+                       </div>
+                     ) : (
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         {Object.entries(selectedMethod.config || {}).map(([key, value]) => (
+                           <div key={key} className="border border-gray-200 rounded-lg p-4">
+                             <label className="block text-sm font-medium text-gray-700 mb-2">
+                               {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                             </label>
+                             <div className="bg-gray-50 rounded p-3">
+                               <code className="text-sm text-gray-800 break-all">{String(value)}</code>
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                     )}
+                   </div>
+                 </div>
+
+                 {/* Actions Panel */}
+                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
+                   <div className="flex flex-wrap gap-3">
+                     <button 
+                       onClick={() => handleToggleStatus(selectedMethod)}
+                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                         selectedMethod.isActive
+                           ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                           : 'bg-green-100 text-green-700 hover:bg-green-200'
+                       }`}
+                     >
+                       {selectedMethod.isActive ? 'Deactivate' : 'Activate & Deactivate Others'}
+                     </button>
+                     
+                                           <button 
+                        onClick={() => handleEdit(selectedMethod)}
+                        className="px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 rounded-lg hover:from-purple-200 hover:to-pink-200 font-medium transition-colors"
+                      >
+                        Edit Configuration
+                      </button>
+                      
+                      <button 
+                        onClick={() => handleClearConfig ? handleClearConfig(selectedMethod.id) : handleDelete(selectedMethod.id)}
+                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium transition-colors"
+                        title="Clear Configuration"
+                      >
+                        Clear Configuration
+                      </button>
+                     
+         
+                     
+                    
+                   </div>
+                 </div>
+               </div>
+             )}
+           </div>
+         </div>
+       </div>
+     </div>
+   );
+ };
 
 export default PaymentMethodsTable;

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Edit, Eye, Trash2, Users, Package, ShoppingCart, DollarSign, Search, Bell } from 'lucide-react';
-import { User, Product, Order, Tax, PaymentMethod, TabType, ModalType } from './adminTypes';
+import { User, Product, Order, Tax, PaymentMethod, Currency, TabType, ModalType } from './adminTypes';
 import StatsCard from './StatsCard';
 import UsersTable from './UsersTable';
 import ProductsTable from './ProductsTable';
@@ -10,6 +10,7 @@ import OrdersTable from './OrdersTable';
 import TaxesTable from './TaxesTable';
 import PaymentMethodsTable from './PaymentMethodsTable';
 import Modal from './Modal';
+import InvoiceSettings from './InvoiceSettings';
 import InvoiceModal from '../../components/InvoiceModal';
 import { jwtDecode } from "jwt-decode";
 import Header from '../../components/Header';
@@ -25,7 +26,7 @@ import TabBar from './TabBar';
 
 const AdminDashboard: React.FC = () => {
   // All hooks at the top!
-  const { getCurrencySymbol } = useCurrency();
+  const { getCurrencySymbol, refreshBaseCurrency } = useCurrency();
   const { t } = useLanguage();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('users');
@@ -34,36 +35,43 @@ const AdminDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [taxes, setTaxes] = useState<Tax[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<ModalType>('add');
-  const [selectedItem, setSelectedItem] = useState<User | Product | Order | Tax | PaymentMethod | null>(null);
+  const [selectedItem, setSelectedItem] = useState<User | Product | Order | Tax | PaymentMethod | Currency | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [togglingCurrencyId, setTogglingCurrencyId] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log("AdminDashboard useEffect running");
     const token = localStorage.getItem('authToken');
     if (!token) {
       setIsAuthorized(false);
+      setLoading(false);
       return;
     }
     try {
       const decoded: any = jwtDecode(token);
-      console.log('Decoded JWT:', decoded); // Debug: see the token structure
+   
+      
       // Try both 'role' and 'user.role' in case the backend nests it
-      if (decoded.role === 'ADMIN' || (decoded.user && decoded.user.role === 'ADMIN')) {
+      const isAdmin = decoded.role === 'ADMIN' || (decoded.user && decoded.user.role === 'ADMIN');
+      
+      if (isAdmin) {
         setIsAuthorized(true);
       } else {
         setIsAuthorized(false);
+        setLoading(false);
       }
     } catch (e) {
       setIsAuthorized(false);
+      setLoading(false);
     }
   }, []);
 
@@ -93,11 +101,37 @@ const AdminDashboard: React.FC = () => {
         setOrders(ordersData);
 
         // Fetch taxes
-        const taxesRes = await fetch('http://localhost:3001/api/taxes', {
+        try {
+          const taxesRes = await fetch('http://localhost:3001/api/taxes/active', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          if (taxesRes.ok) {
+            const taxesData = await taxesRes.json();
+            
+            // Ensure we always set an array
+            if (Array.isArray(taxesData)) {
+              setTaxes(taxesData);
+            } else if (taxesData && Array.isArray(taxesData.taxes)) {
+              setTaxes(taxesData.taxes);
+            } else {
+              setTaxes([]);
+            }
+          } else {
+            setTaxes([]);
+          }
+        } catch (taxError) {
+          setTaxes([]);
+        }
+
+        // Fetch currencies
+        const currenciesRes = await fetch('http://localhost:3001/api/settings/currencies', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        const taxesData = await taxesRes.json();
-        setTaxes(taxesData);
+        const currenciesData = await currenciesRes.json();
+        // Handle both direct array and nested currencies object
+        const currenciesArray = Array.isArray(currenciesData) ? currenciesData : (currenciesData.currencies || []);
+        setCurrencies(currenciesArray as Currency[]);
 
         // Fetch payment methods
         try {
@@ -106,14 +140,9 @@ const AdminDashboard: React.FC = () => {
           });
           
           if (!paymentMethodsRes.ok) {
-            console.error('Payment methods fetch failed:', paymentMethodsRes.status, paymentMethodsRes.statusText);
             setPaymentMethods([]);
           } else {
             const paymentMethodsData = await paymentMethodsRes.json();
-            console.log('Payment methods response:', paymentMethodsData);
-            console.log('Payment methods type:', typeof paymentMethodsData);
-            console.log('Is array:', Array.isArray(paymentMethodsData));
-            console.log('Existing payment method codes:', paymentMethodsData.map((pm: any) => pm.code));
             
             // Ensure we always set an array
             if (Array.isArray(paymentMethodsData)) {
@@ -121,12 +150,10 @@ const AdminDashboard: React.FC = () => {
             } else if (paymentMethodsData && Array.isArray(paymentMethodsData.data)) {
               setPaymentMethods(paymentMethodsData.data);
             } else {
-              console.warn('Payment methods data is not an array, setting empty array');
               setPaymentMethods([]);
             }
           }
         } catch (paymentError) {
-          console.error('Error fetching payment methods:', paymentError);
           setPaymentMethods([]);
         }
 
@@ -137,7 +164,6 @@ const AdminDashboard: React.FC = () => {
         // setTotalRevenue(totalRevenue); // This line was removed from the original file, so it's removed here.
 
       } catch (error) {
-        console.error('Error fetching data:', error);
         setError('Failed to fetch data');
       } finally {
         setLoading(false);
@@ -243,7 +269,6 @@ const AdminDashboard: React.FC = () => {
             });
 
             if (response.ok) {
-              console.log(`Created default payment method: ${method.name}`);
             } else {
               console.error(`Failed to create ${method.name}:`, response.statusText);
             }
@@ -305,32 +330,26 @@ const AdminDashboard: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleEdit = (item: User | Product | Order | Tax | PaymentMethod) => {
+  const handleEdit = (item: User | Product | Order | Tax | PaymentMethod | Currency) => {
     setModalType('edit');
     setSelectedItem(item);
     setShowModal(true);
   };
 
-  const handleView = (item: User | Product | Order | Tax | PaymentMethod) => {
-    console.log('=== handleView called ===');
-    console.log('Item:', item);
-    console.log('Active tab:', activeTab);
-    console.log('Item type check:', 'items' in item ? 'Order' : 'Other');
+  const handleView = (item: User | Product | Order | Tax | PaymentMethod | Currency) => {
+
     
     // If this is an order item, automatically switch to orders tab
     if (item && 'items' in item && Array.isArray(item.items)) {
-      console.log('Detected order item, switching to orders tab');
       setActiveTab('orders');
     }
     
     if (activeTab === 'orders' || ('items' in item && Array.isArray(item.items))) {
       // For orders, show the invoice modal
-      console.log('Showing invoice modal for order:', item);
       setSelectedOrder(item as Order);
       setShowInvoiceModal(true);
     } else {
       // For other items, show the regular modal
-      console.log('Showing regular modal for item:', item);
       setModalType('view');
       setSelectedItem(item);
       setShowModal(true);
@@ -340,7 +359,58 @@ const AdminDashboard: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     
-    console.log(`Attempting to delete ${activeTab.slice(0, -1)} with ID:`, id);
+  
+    
+    // Validate that the item exists in the current state
+    if (activeTab === 'users') {
+      // Check if ID is a valid UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        console.error('Invalid user ID format:', id);
+        setError(`Cannot delete user: Invalid user ID format`);
+        return;
+      }
+      
+      // Refresh users from backend to ensure we have the latest data
+      const freshUsers = await refreshUsers();
+      
+      const userExists = freshUsers.find((user: any) => user.id === id);
+      if (!userExists) {
+        console.error('User not found in fresh backend data:', id);
+        setError(`Cannot delete user: User with ID ${id} not found in backend`);
+        return;
+      }
+    } else if (activeTab === 'currency') {
+      // For currencies, just check if ID is valid UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        console.error('Invalid currency ID format:', id);
+        setError(`Cannot delete currency: Invalid currency ID format`);
+        return;
+      }
+      
+      // Check if currency exists in current state
+      const currencyExists = currencies.find(currency => currency.id === id);
+      if (!currencyExists) {
+        console.error('Currency not found in frontend state:', id);
+        setError(`Cannot delete currency: Currency with ID ${id} not found`);
+        return;
+      }
+    }
+    
+    // Check if backend is accessible
+    try {
+      const healthCheck = await fetch('http://localhost:3001/api/health', { method: 'GET' });
+      if (!healthCheck.ok) {
+        console.error('Backend health check failed');
+        setError('Backend server is not accessible. Please check if the server is running.');
+        return;
+      }
+    } catch (error) {
+      console.error('Backend health check error:', error);
+      setError('Cannot connect to backend server. Please check if the server is running.');
+      return;
+    }
     
     try {
       const token = localStorage.getItem('authToken');
@@ -348,10 +418,10 @@ const AdminDashboard: React.FC = () => {
                       activeTab === 'products' ? 'products' : 
                       activeTab === 'orders' ? 'orders' : 
                       activeTab === 'taxes' ? 'taxes' : 
-                      activeTab === 'paymentMethods' ? 'payment-methods' : 'users';
+                      activeTab === 'paymentMethods' ? 'payment-methods' : 
+                      activeTab === 'currency' ? 'settings/currencies' : 'users';
       
-      console.log('Delete endpoint:', endpoint);
-      console.log('Delete URL:', `http://localhost:3001/api/${endpoint}/${id}`);
+    
       
       const response = await fetch(`http://localhost:3001/api/${endpoint}/${id}`, {
         method: 'DELETE',
@@ -360,8 +430,6 @@ const AdminDashboard: React.FC = () => {
         },
       });
 
-      console.log('Delete response status:', response.status);
-      console.log('Delete response ok:', response.ok);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -369,36 +437,195 @@ const AdminDashboard: React.FC = () => {
         
         try {
           const errorData = JSON.parse(errorText);
+          
+          // Handle 404 "User not found" - this means the user was already deleted or doesn't exist
+          if (response.status === 404 && errorData.error === 'User not found') {
+            // Remove from frontend state if it exists there
+            if (activeTab === 'users') {
+              setUsers(users.filter(user => user.id !== id));
+              toast.success('User removed from list (was already deleted)');
+            }
+            return; // Exit early, don't treat as error
+          }
+          
+          // Handle 404 errors in general
+          if (response.status === 404) {
+            if (activeTab === 'users') {
+              setUsers(users.filter(user => user.id !== id));
+              toast.success('User removed from list (was already deleted)');
+            } else if (activeTab === 'currency') {
+              setCurrencies(currencies.filter(currency => currency.id !== id));
+              toast.success('Currency removed from list (was already deleted)');
+            }
+            return; // Exit early, don't treat as error
+          }
+          
+          // Handle tax deletion errors (products dependency)
           if (errorData.products && Array.isArray(errorData.products)) {
             const productNames = errorData.products.map((p: any) => p.name).join(', ');
             throw new Error(`Cannot delete tax. It is being used by: ${productNames}. Please remove or change the tax from these products first.`);
-          } else {
-            throw new Error(errorData.error || `Failed to delete: ${response.status} ${response.statusText}`);
           }
+          
+          // Handle user deletion errors (orders/reviews dependency)
+          if (errorData.dependencies) {
+            let message = 'Cannot delete user. ';
+            const reasons = [];
+            
+            // Safely check orders
+            const orders = errorData.dependencies.orders;
+            if (orders && Array.isArray(orders) && orders.length > 0) {
+              reasons.push(`${orders.length} order(s)`);
+            }
+            
+            // Safely check reviews
+            const reviews = errorData.dependencies.reviews;
+            if (reviews && Array.isArray(reviews) && reviews.length > 0) {
+              reasons.push(`${reviews.length} review(s)`);
+            }
+            
+            if (reasons.length > 0) {
+              message += `User has ${reasons.join(' and ')}. Please delete these first or reassign them.`;
+              throw new Error(message);
+            }
+          }
+          
+          // Handle other errors
+          throw new Error(errorData.error || `Failed to delete: ${response.status} ${response.statusText}`);
         } catch (parseError) {
           throw new Error(`Failed to delete: ${response.status} ${response.statusText} - ${errorText}`);
         }
       }
 
       const responseData = await response.text();
-      console.log('Delete response data:', responseData);
 
       if (activeTab === 'users') {
         setUsers(users.filter(user => user.id !== id));
+        toast.success('User deleted successfully!');
       } else if (activeTab === 'products') {
         setProducts(products.filter(product => product.id !== id));
+        toast.success('Product deleted successfully!');
       } else if (activeTab === 'orders') {
         setOrders(orders.filter(order => order.id !== id));
+        toast.success('Order deleted successfully!');
       } else if (activeTab === 'taxes') {
         setTaxes(taxes.filter(tax => tax.id !== id));
+        toast.success('Tax deleted successfully!');
       } else if (activeTab === 'paymentMethods') {
         setPaymentMethods(paymentMethods.filter(pm => pm.id !== id));
+        toast.success('Payment method deleted successfully!');
+      } else if (activeTab === 'currency') {
+        setCurrencies(currencies.filter(currency => currency.id !== id));
+        toast.success('Currency deleted successfully!');
       }
       
-      console.log(`Successfully deleted ${activeTab.slice(0, -1)} with ID:`, id);
     } catch (err) {
       console.error('Delete error:', err);
       setError(`Failed to delete ${activeTab.slice(0, -1)}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const refreshUsers = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('http://localhost:3001/api/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const freshUsers = await response.json();
+        setUsers(freshUsers);
+        return freshUsers;
+      }
+    } catch (error) {
+      console.error('Error refreshing users:', error);
+    }
+    return users;
+  };
+
+  const canDeleteUser = async (userId: string): Promise<{ canDelete: boolean; reason?: string }> => {
+    // Only check user deletion when we're actually on the users tab
+    if (activeTab !== 'users') {
+      return { canDelete: true };
+    }
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      const response = await fetch(`http://localhost:3001/api/users/${userId}/check-delete`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      
+      if (response.ok) {
+        const data = await response.json();
+        return { canDelete: data.canDelete, reason: data.reason };
+      }
+      
+      if (response.status === 404) {
+        console.warn('User not found when checking deletion:', userId);
+        return { canDelete: false, reason: 'User not found' };
+      }
+      
+      console.warn('Check delete failed, defaulting to allow deletion');
+      return { canDelete: true }; // Default to allowing deletion if check fails
+    } catch (error) {
+      console.error('Error checking user deletion:', error);
+      return { canDelete: true }; // Default to allowing deletion if check fails
+    }
+  };
+
+  const handleClearPaymentMethodConfig = async (id: string) => {
+    if (!window.confirm('Are you sure you want to clear the configuration for this payment method? This will reset all API keys and settings but keep the method structure.')) return;
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      const paymentMethod = paymentMethods.find(pm => pm.id === id);
+      
+      if (!paymentMethod) {
+        throw new Error('Payment method not found');
+      }
+      
+      console.log(`Clearing configuration for payment method: ${paymentMethod.name}`);
+      
+      // Use the new update endpoint to clear configuration
+      const response = await fetch(`http://localhost:3001/api/payment-methods/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config: {}, // Clear the configuration
+          isActive: false // Also deactivate when clearing config
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to clear configuration: ${response.status}`);
+      }
+
+      const updatedPaymentMethod = await response.json();
+      
+      // Update the payment methods list - keep the method but clear its config
+      setPaymentMethods(prevMethods => 
+        prevMethods.map(pm => 
+          pm.id === id 
+            ? { ...pm, config: {}, isActive: false }
+            : pm
+        )
+      );
+      
+      toast.success('Payment method configuration cleared successfully');
+      
+    } catch (err) {
+      console.error('Clear configuration error:', err);
+      setError(`Failed to clear configuration: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -406,6 +633,17 @@ const AdminDashboard: React.FC = () => {
     try {
       const token = localStorage.getItem('authToken');
       const newActiveStatus = !paymentMethod.isActive;
+      
+      // If we're activating a payment method, show confirmation dialog
+      if (newActiveStatus) {
+        const confirmMessage = `Do you want to activate "${paymentMethod.name}" and deactivate all other payment methods?`;
+        const userConfirmed = window.confirm(confirmMessage);
+        
+        if (!userConfirmed) {
+          console.log('User cancelled payment method activation');
+          return;
+        }
+      }
       
       console.log(`Toggling payment method ${paymentMethod.name} to ${newActiveStatus ? 'active' : 'inactive'}`);
       
@@ -424,7 +662,7 @@ const AdminDashboard: React.FC = () => {
 
       const updatedPaymentMethod = await response.json();
       
-      // Update the payment methods list
+      // Update the payment methods list immediately
       setPaymentMethods(prevMethods => 
         prevMethods.map(pm => 
           pm.id === paymentMethod.id 
@@ -433,11 +671,73 @@ const AdminDashboard: React.FC = () => {
         )
       );
       
-      toast.success(updatedPaymentMethod.message || 'Payment method status updated successfully');
+      // Show appropriate success message
+      if (newActiveStatus) {
+        toast.success(`"${paymentMethod.name}" activated and all other payment methods deactivated!`);
+      } else {
+        toast.success(`"${paymentMethod.name}" deactivated successfully!`);
+      }
       
     } catch (err) {
       console.error('Toggle status error:', err);
       toast.error(`Failed to toggle payment method status: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleToggleCurrencyStatus = async (currency: any) => {
+    try {
+      setTogglingCurrencyId(currency.id);
+      const token = localStorage.getItem('authToken');
+      
+      console.log(`Toggling currency ${currency.name} status`);
+      
+      const response = await fetch(`http://localhost:3001/api/settings/currencies/${currency.id}/toggle`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'  ,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to toggle currency status: ${response.status}`);
+      }
+
+      const updatedCurrency = await response.json();
+      
+      // Handle deactivation immediately (no refresh needed)
+      if (!updatedCurrency.isActive) {
+        setCurrencies(prevCurrencies => 
+          prevCurrencies.map(c => 
+            c.id === currency.id ? { ...c, isActive: false } : c
+          )
+        );
+      } else {
+        // For activation, force a page refresh to show updated state
+        toast.success('Currency activated! Refreshing page to show changes...');
+        
+        // Force page refresh after a short delay
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
+
+      // Refresh base currency context if needed
+      if (updatedCurrency.isBase) {
+        refreshBaseCurrency();
+      }
+      
+      // Only show success message for deactivation (activation shows its own message)
+      if (!updatedCurrency.isActive) {
+        toast.success(updatedCurrency.message || 'Currency deactivated successfully');
+      }
+      
+    } catch (err) {
+      console.error('Toggle currency status error:', err);
+      toast.error(`Failed to toggle currency status: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setTogglingCurrencyId(null);
     }
   };
 
@@ -479,7 +779,7 @@ const AdminDashboard: React.FC = () => {
   const handleSave = async (formData: any) => {
     try {
       const token = localStorage.getItem('authToken');
-      let updatedItem: User | Product | Order | Tax;
+      let updatedItem: User | Product | Order | Tax | PaymentMethod | Currency;
   
       if (activeTab === 'orders' && modalType === 'edit') {
         const token = localStorage.getItem('authToken');
@@ -493,15 +793,12 @@ const AdminDashboard: React.FC = () => {
         });
         updatedItem = await response.json();
         setOrders(orders.map(order => order.id === updatedItem.id ? updatedItem as Order : order));
+        toast.success(`Order #${(updatedItem as Order).id} updated successfully!`);
   
       } else if (activeTab === 'products') {
         // ✅ STEP 1: Create or update product
         
-        // Validate required fields including tax
-        if (!formData.taxId) {
-          toast.error('Tax selection is required for all products');
-          return;
-        }
+        // Tax is optional - will use default 10% if not selected
         
         const endpoint = 'products';
         const method = modalType === 'add' ? 'POST' : 'PATCH';
@@ -511,13 +808,13 @@ const AdminDashboard: React.FC = () => {
   
       
         const { imageFile, ...productData } = formData;
-  
+        
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(productData),
         });
-  
+
         updatedItem = await response.json();
   
      
@@ -536,15 +833,14 @@ const AdminDashboard: React.FC = () => {
   
         if (modalType === 'add') {
           setProducts([...products, updatedItem as Product]);
+          toast.success(`Product "${(updatedItem as Product).name || 'New Product'}" created successfully!`);
         } else {
           setProducts(products.map(product => product.id === updatedItem.id ? updatedItem as Product : product));
+          toast.success(`Product "${(updatedItem as Product).name || 'Product'}" updated successfully!`);
         }
   
-      } else if (activeTab === 'taxes') {
+      } else if (activeTab === 'taxes' || modalType === 'add-tax') {
         // Tax management
-        console.log('=== Creating/Updating Tax ===');
-        console.log('Form data:', formData);
-        console.log('Modal type:', modalType);
         
         // Prepare tax data - only send rate and isActive
         const taxData = {
@@ -553,14 +849,10 @@ const AdminDashboard: React.FC = () => {
         };
         
         const endpoint = 'taxes';
-        const method = modalType === 'add' ? 'POST' : 'PUT';
-        const url = modalType === 'add'
+        const method = modalType === 'add' || modalType === 'add-tax' ? 'POST' : 'PUT';
+        const url = modalType === 'add' || modalType === 'add-tax'
           ? `http://localhost:3001/api/${endpoint}`
           : `http://localhost:3001/api/${endpoint}/${formData.id}`;
-
-        console.log('Request URL:', url);
-        console.log('Request method:', method);
-        console.log('Request payload:', JSON.stringify(taxData, null, 2));
 
         const response = await fetch(url, {
           method,
@@ -571,28 +863,47 @@ const AdminDashboard: React.FC = () => {
           body: JSON.stringify(taxData),
         });
 
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
-
         if (!response.ok) {
-          const errorData = await response.text();
-          console.error('Tax creation error response:', errorData);
           throw new Error(`Tax creation failed: ${response.status} ${response.statusText}`);
         }
 
         updatedItem = await response.json();
-        console.log('Created/Updated tax:', updatedItem);
 
-        if (modalType === 'add') {
+        if (modalType === 'add' || modalType === 'add-tax') {
           setTaxes([...taxes, updatedItem as Tax]);
+          // If this was called from product creation, update the modal type back to add
+          if (modalType === 'add-tax') {
+            setModalType('add');
+            // Update the selectedItem to include the new tax ID for the product form
+            if (selectedItem && (activeTab as TabType) === 'products') {
+              setSelectedItem({
+                ...selectedItem,
+                taxId: updatedItem.id
+              });
+            }
+            toast.success(`Tax rate ${(updatedItem as Tax).rate}% created successfully! Now you can select it for your product.`);
+          } else {
+            toast.success(`Tax rate ${(updatedItem as Tax).rate}% created successfully!`);
+          }
         } else {
           setTaxes(taxes.map(tax => tax.id === updatedItem.id ? updatedItem as Tax : tax));
+          toast.success(`Tax rate ${(updatedItem as Tax).rate}% updated successfully!`);
+          
+          // Force refresh taxes data from backend
+          try {
+            const refreshRes = await fetch('http://localhost:3001/api/taxes/active', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (refreshRes.ok) {
+              const freshTaxes = await refreshRes.json();
+              setTaxes(Array.isArray(freshTaxes) ? freshTaxes : []);
+            }
+          } catch (refreshError) {
+            // Silent error handling
+          }
         }
       } else if (activeTab === 'paymentMethods') {
         // Payment Method management
-        console.log('=== Creating/Updating Payment Method ===');
-        console.log('Form data:', formData);
-        console.log('Modal type:', modalType);
         
         const paymentMethodData = {
           name: formData.name,
@@ -608,9 +919,7 @@ const AdminDashboard: React.FC = () => {
           ? `http://localhost:3001/api/${endpoint}`
           : `http://localhost:3001/api/${endpoint}/${formData.id}`;
 
-        console.log('Request URL:', url);
-        console.log('Request method:', method);
-        console.log('Request payload:', JSON.stringify(paymentMethodData, null, 2));
+
 
         const response = await fetch(url, {
           method,
@@ -627,6 +936,8 @@ const AdminDashboard: React.FC = () => {
         if (!response.ok) {
           const errorData = await response.text();
           console.error('Payment method creation error response:', errorData);
+          console.error('Response status:', response.status);
+          console.error('Response status text:', response.statusText);
           
           // Try to parse the error message for better user feedback
           let errorMessage = 'Payment method creation failed';
@@ -639,6 +950,7 @@ const AdminDashboard: React.FC = () => {
             errorMessage = `Payment method creation failed: ${response.status} ${response.statusText}`;
           }
           
+          console.error('Final error message:', errorMessage);
           throw new Error(errorMessage);
         }
 
@@ -646,9 +958,127 @@ const AdminDashboard: React.FC = () => {
         console.log('Created/Updated payment method:', updatedItem);
 
         if (modalType === 'add') {
-          setPaymentMethods([...paymentMethods, updatedItem as unknown as PaymentMethod]);
+          setPaymentMethods([...paymentMethods, updatedItem as PaymentMethod]);
+          toast.success(`Payment method "${(updatedItem as PaymentMethod).name}" created successfully!`);
         } else {
-          setPaymentMethods(paymentMethods.map(pm => pm.id === updatedItem.id ? updatedItem as unknown as PaymentMethod : pm));
+          setPaymentMethods(paymentMethods.map(pm => pm.id === updatedItem.id ? updatedItem as PaymentMethod : pm));
+          toast.success(`Payment method "${(updatedItem as PaymentMethod).name}" updated successfully!`);
+        }
+      } else if (activeTab === 'currency') {
+        // Currency management
+        console.log('=== Creating/Updating Currency ===');
+        console.log('Form data:', formData);
+        console.log('Modal type:', modalType);
+        
+        const currencyData = {
+          name: formData.name,
+          code: formData.code,
+          symbol: formData.symbol,
+          isActive: formData.isActive,
+          exchangeRate: formData.exchangeRate || 1,
+          isBase: formData.isBase || false
+        };
+        
+        const endpoint = 'settings/currencies';
+        const method = modalType === 'add' ? 'POST' : 'PUT';
+        const url = modalType === 'add'
+          ? `http://localhost:3001/api/${endpoint}`
+          : `http://localhost:3001/api/${endpoint}/${formData.id}`;
+
+        console.log('Request URL:', url);
+        console.log('Request method:', method);
+        console.log('Request payload:', JSON.stringify(currencyData, null, 2));
+
+        const response = await fetch(url, {
+          method,
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(currencyData),
+        });
+
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error('Currency creation error response:', errorData);
+          throw new Error(`Currency creation failed: ${response.status} ${response.statusText}`);
+        }
+
+        updatedItem = await response.json();
+        console.log('Created/Updated currency:', updatedItem);
+        console.log('Currency name:', (updatedItem as any).currency?.name);
+        console.log('Currency code:', (updatedItem as any).currency?.code);
+        console.log('Full updatedItem:', JSON.stringify(updatedItem, null, 2));
+
+        // Handle base currency exclusivity - only one can be base
+        if ((updatedItem as any).currency?.isBase) {
+          // If this currency is being set as base, remove base from all others
+          setCurrencies(prevCurrencies => 
+            prevCurrencies.map(currency => ({
+              ...currency,
+              isBase: false
+            }))
+          );
+        }
+
+        // Handle active currency exclusivity - only one can be active
+        if ((updatedItem as any).currency?.isActive) {
+          // If this currency is being set as active, deactivate all others
+          setCurrencies(prevCurrencies => 
+            prevCurrencies.map(currency => ({
+              ...currency,
+              isActive: false
+            }))
+          );
+        }
+
+        // Update the specific currency in the state
+        setCurrencies(prevCurrencies => 
+          prevCurrencies.map(currency => 
+            currency.id === (updatedItem as any).currency?.id ? (updatedItem as any).currency : currency
+          )
+        );
+
+        // Refresh base currency context if needed
+        if ((updatedItem as any).currency?.isBase) {
+          refreshBaseCurrency();
+        }
+
+        if (modalType === 'add') {
+          // For new currencies, add to state and handle exclusivity
+          setCurrencies(prevCurrencies => {
+            let newCurrencies = [...prevCurrencies, (updatedItem as any).currency];
+            
+            // Handle base currency exclusivity for new currency
+            if ((updatedItem as any).currency?.isBase) {
+              newCurrencies = newCurrencies.map(currency => ({
+                ...currency,
+                isBase: currency.id === (updatedItem as any).currency?.id
+              }));
+            }
+            
+            // Handle active currency exclusivity for new currency
+            if ((updatedItem as any).currency?.isActive) {
+              newCurrencies = newCurrencies.map(currency => ({
+                ...currency,
+                isActive: currency.id === (updatedItem as any).currency?.id
+              }));
+            }
+            
+            return newCurrencies;
+          });
+
+          // Refresh base currency context if needed
+          if ((updatedItem as any).currency?.isBase) {
+            refreshBaseCurrency();
+          }
+
+          toast.success(`Currency "${(updatedItem as any).currency?.name || (updatedItem as any).currency?.code || 'Unknown'}" created successfully!`);
+        } else {
+          toast.success(`Currency "${(updatedItem as any).currency?.name || (updatedItem as any).currency?.code || 'Unknown'}" updated successfully!`);
         }
       } else {
         // Other tabs (users, orders)
@@ -690,18 +1120,29 @@ const AdminDashboard: React.FC = () => {
           setUsers(modalType === 'add'
             ? [...users, updatedItem as User]
             : users.map(user => user.id === updatedItem.id ? updatedItem as User : user));
+          toast.success(modalType === 'add' 
+            ? `User "${(updatedItem as User).name}" created successfully!`
+            : `User "${(updatedItem as User).name}" updated successfully!`);
         } else if (activeTab === 'orders') {
           setOrders(modalType === 'add'
             ? [...orders, updatedItem as Order]
             : orders.map(order => order.id === updatedItem.id ? updatedItem as Order : order));
+          toast.success(modalType === 'add'
+            ? `Order #${(updatedItem as Order).id} created successfully!`
+            : `Order #${(updatedItem as Order).id} updated successfully!`);
         }
       }
   
       setShowModal(false);
   
     } catch (err) {
-      setError(`Failed to ${modalType} ${activeTab.slice(0, -1)}.`);
-      console.error(err);
+      console.error('=== Error in handleSave ===');
+      console.error('Error details:', err);
+      console.error('Error message:', err instanceof Error ? err.message : 'Unknown error');
+      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      
+      const errorMessage = err instanceof Error ? err.message : `Failed to ${modalType} ${activeTab.slice(0, -1)}.`;
+      setError(errorMessage);
     }
   };
   
@@ -719,6 +1160,146 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
   
+  ///render currencies
+  const renderCurrencies = () => (
+    <div className="space-y-6">
+      <div className="bg-violet-50 rounded-2xl shadow-lg border border-violet-100/70 overflow-hidden">
+        {/* Table Header */}
+        <div className="bg-gradient-to-r from-slate-50 to-gray-50 px-6 py-4 border-b border-gray-200/70">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Currencies</h2>
+                <p className="text-sm text-gray-600">Manage your store currencies and exchange rates</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exchange Rate</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {currencies.map((currency, index) => (
+                <tr key={currency.id || `currency-${index}`} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">{currency.name}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{currency.code}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{currency.symbol}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{currency.exchangeRate}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {currency.isBase ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Base
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {currency.isActive ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleView(currency)}
+                        className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleEdit(currency)}
+                        className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleToggleCurrencyStatus(currency)}
+                        disabled={togglingCurrencyId === currency.id}
+                        className={`p-1 rounded transition-colors ${
+                          togglingCurrencyId === currency.id
+                            ? 'opacity-50 cursor-not-allowed'
+                            : currency.isActive 
+                              ? 'text-green-600 hover:text-green-900 hover:bg-green-50' 
+                              : 'text-orange-600 hover:text-orange-900 hover:bg-orange-50'
+                        }`}
+                        title={currency.isActive ? 'Deactivate' : 'Activate'}
+                      >
+                        {togglingCurrencyId === currency.id ? (
+                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+                        ) : currency.isActive ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(currency.id)}
+                        className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Empty State */}
+        {currencies?.length === 0 && (
+          <div className="text-center py-12">
+            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No currencies found</h3>
+            <p className="text-gray-500 max-w-sm mx-auto">Add your first currency to get started.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   ///render users 
   const renderUsers = () => (
     <div className="space-y-6">
@@ -1313,30 +1894,35 @@ const AdminDashboard: React.FC = () => {
           orders={orders} 
           taxes={taxes}
           paymentMethods={paymentMethods}
+          currencies={currencies}
           onAddNew={handleAddNew} 
         />
         {/* Tab Content */}
         <div className="space-y-6">
-          {activeTab === 'users' && <UsersTable users={users} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} />}
+          {activeTab === 'users' && <UsersTable users={users} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} canDeleteUser={canDeleteUser} />}
           {activeTab === 'products' && <ProductsTable products={products} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} taxes={taxes} />}
           {activeTab === 'orders' && <OrdersTable orders={orders} users={users} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} />}
           {activeTab === 'taxes' && <TaxesTable taxes={taxes} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDeleteTax} />}
-          {activeTab === 'paymentMethods' && <PaymentMethodsTable paymentMethods={paymentMethods} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} handleToggleStatus={handleToggleStatus} />}
+          {activeTab === 'paymentMethods' && <PaymentMethodsTable key={`payment-methods-${paymentMethods.length}`} paymentMethods={paymentMethods} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} handleToggleStatus={handleToggleStatus} onAddNew={handleAddNew} handleClearConfig={handleClearPaymentMethodConfig} />}
+          {activeTab === 'currency' && renderCurrencies()}
+          {activeTab === 'invoiceSettings' && <InvoiceSettings />}
         </div>
         {showModal && (
-          <Modal
-            modalType={modalType}
-            showModal={showModal}
-            setShowModal={setShowModal}
-            selectedItem={selectedItem}
-            handleSave={handleSave}
-            activeTab={activeTab}
-            users={users}
-            products={products}
-            orders={orders}
-            taxes={taxes}
-            paymentMethods={paymentMethods}
-          />
+                  <Modal
+          modalType={modalType}
+          showModal={showModal}
+          setShowModal={setShowModal}
+          setModalType={setModalType}
+          selectedItem={selectedItem}
+          handleSave={handleSave}
+          activeTab={activeTab}
+          users={users}
+          products={products}
+          orders={orders}
+          taxes={taxes}
+          paymentMethods={paymentMethods}
+          currencies={currencies}
+        />
         )}
         
         {/* Invoice Modal */}

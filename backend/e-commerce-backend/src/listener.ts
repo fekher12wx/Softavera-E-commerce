@@ -12,12 +12,10 @@ const startListener = async () => {
 
     client.on('notification', (msg) => {
       if (msg.channel === 'new_order') {
-        console.log('Received new order notification:', msg.payload);
         broadcast(msg.payload || 'New order received');
       }
     });
 
-    console.log('Database listener active on "new_order" channel');
   } catch (err) {
     console.error('Error setting up DB listener:', err);
   }

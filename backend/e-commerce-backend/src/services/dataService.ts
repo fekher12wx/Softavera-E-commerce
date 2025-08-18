@@ -90,7 +90,12 @@ export class DatabaseService {
       LEFT JOIN taxes t ON p.tax_id = t.id
       ORDER BY p.created_at DESC
     `);
-    return result.rows.map(this.mapProductRowWithTax);
+
+    
+    const mappedProducts = result.rows.map(this.mapProductRowWithTax);
+
+    
+    return mappedProducts;
   }
 
   // Get products by category
@@ -149,7 +154,20 @@ export class DatabaseService {
     return result.rows.length > 0 ? this.mapProductRow(result.rows[0]) : null;
   }
 
-  async createProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {
+  async getProductByIdWithTax(id: string): Promise<ProductWithTax | null> {
+    const result = await pool.query(`
+      SELECT 
+        p.*,
+        t.rate as tax_rate,
+        t.name as tax_name
+      FROM products p
+      LEFT JOIN taxes t ON p.tax_id = t.id
+      WHERE p.id = $1
+    `, [id]);
+    return result.rows.length > 0 ? this.mapProductRowWithTax(result.rows[0]) : null;
+  }
+
+  async createProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProductWithTax> {
     const id = uuidv4();
     const now = new Date();
     const query = `
@@ -174,20 +192,37 @@ export class DatabaseService {
     ];
     
     const result = await pool.query(query, values);
-    return this.mapProductRow(result.rows[0]);
+    
+    // Get the created product with tax information
+    const createdProduct = await this.getProductByIdWithTax(id);
+    return createdProduct!;
   }
 
-  async updateProduct(id: string, updates: Partial<Product>): Promise<Product | null> {
-    const updateFields = { ...updates, updatedAt: new Date() };
+  async updateProduct(id: string, updates: Partial<Product>): Promise<ProductWithTax | null> {
+    // Filter out computed fields that shouldn't be updated in the database
+    const { taxRate, taxName, ...databaseUpdates } = updates as any;
+    
+    const updateFields = { ...databaseUpdates, updatedAt: new Date() };
+    
+    // Log what's being updated for debugging
+
+    
     const setClause = Object.keys(updateFields)
       .map((key, index) => `${this.camelToSnake(key)} = $${index + 2}`)
       .join(', ');
     
     const values = [id, ...Object.values(updateFields)];
     const query = `UPDATE products SET ${setClause} WHERE id = $1 RETURNING *`;
-    
+  
     const result = await pool.query(query, values);
-    return result.rows.length > 0 ? this.mapProductRow(result.rows[0]) : null;
+    
+    if (result.rows.length > 0) {
+      // Get the updated product with tax information
+      const updatedProduct = await this.getProductByIdWithTax(id);
+      return updatedProduct;
+    }
+    
+    return null;
   }
 
   async deleteProduct(id: string): Promise<boolean> {
@@ -234,7 +269,6 @@ export class DatabaseService {
   async updateUser(id: string, updates: Partial<User>): Promise<User | null> {
     try {
       const { address, ...userUpdates } = updates;
-      console.log('Updating user in database:', { id, updates, address });
       
       // Build the SET clause and values array
       const updateFields: any = { ...userUpdates };
@@ -273,18 +307,15 @@ export class DatabaseService {
         RETURNING id, email, name, role, street, city, zip_code, country, created_at, updated_at
       `;
 
-      console.log('Executing query:', query);
-      console.log('With values:', values);
+      
 
       const result = await pool.query(query, values);
       
       if (result.rows.length === 0) {
-        console.log('No user found with ID:', id);
         return null;
       }
 
       const updatedUser = this.mapUserRow(result.rows[0]);
-      console.log('Updated user:', updatedUser);
       return updatedUser;
     } catch (error) {
       console.error('Error updating user:', error);
@@ -292,9 +323,37 @@ export class DatabaseService {
     }
   }
 
-  async deleteUser(id: string): Promise<boolean> {
-    const result = await pool.query('DELETE FROM users WHERE id = $1', [id]);
-    return (result.rowCount ?? 0) > 0;
+  async deleteUser(id: string): Promise<{ success: boolean; dependencies?: { orders?: any[]; reviews?: any[] }; userExists?: boolean }> {
+    try {
+      
+      // First check if user exists
+      const userExists = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
+      if (userExists.rows.length === 0) {
+        return { success: false, userExists: false };
+      }
+      
+      // Check for dependencies
+      const ordersResult = await pool.query('SELECT id FROM orders WHERE user_id = $1', [id]);
+      const reviewsResult = await pool.query('SELECT id FROM reviews WHERE user_id = $1', [id]);
+      
+      if (ordersResult.rows.length > 0 || reviewsResult.rows.length > 0) {
+        return {
+          success: false,
+          dependencies: {
+            orders: ordersResult.rows,
+            reviews: reviewsResult.rows
+          },
+          userExists: true
+        };
+      }
+      
+      // If no dependencies, proceed with deletion
+      const result = await pool.query('DELETE FROM users WHERE id = $1', [id]);
+      return { success: (result.rowCount ?? 0) > 0, userExists: true };
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      return { success: false, userExists: false };
+    }
   }
 
   // Order methods
@@ -599,6 +658,196 @@ export class DatabaseService {
     );
   }
 
+  // Multi-currency management methods
+  async getCurrencies(): Promise<any[]> {
+    try {
+      const result = await pool.query(
+        'SELECT id, name, code, symbol, is_active, exchange_rate, is_base, created_at, updated_at FROM currencies ORDER BY is_base DESC, name ASC'
+      );
+      return result.rows.map(this.mapCurrencyRow);
+    } catch (error) {
+      console.error('Error getting currencies:', error);
+      return [];
+    }
+  }
+
+  async getBaseCurrency(): Promise<any> {
+    try {
+      const result = await pool.query('SELECT * FROM currencies WHERE is_base = true LIMIT 1');
+      if (result.rows.length === 0) {
+        return null; // No base currency set
+      }
+      return this.mapCurrencyRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error getting base currency:', error);
+      throw new Error('Failed to get base currency');
+    }
+  }
+
+  async addCurrency(currencyData: { name: string; code: string; symbol: string; isActive?: boolean; exchangeRate?: number; isBase?: boolean }): Promise<any> {
+    try {
+      const id = uuidv4();
+      const now = new Date();
+      
+      // If this is a base currency, ensure no other base currency exists
+      if (currencyData.isBase) {
+        const baseUpdateResult = await pool.query('UPDATE currencies SET is_base = false WHERE is_base = true');
+      }
+
+      // Note: Multiple currencies can be active at the same time
+      // No need to deactivate others when setting a currency as active
+      
+      const result = await pool.query(
+        `INSERT INTO currencies (id, name, code, symbol, is_active, exchange_rate, is_base, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+         RETURNING id, name, code, symbol, is_active, exchange_rate, is_base, created_at, updated_at`,
+        [
+          id,
+          currencyData.name,
+          currencyData.code.toUpperCase(),
+          currencyData.symbol,
+          currencyData.isActive !== undefined ? currencyData.isActive : true,
+          currencyData.exchangeRate || 1,
+          currencyData.isBase || false,
+          now,
+          now
+        ]
+      );
+      
+      return this.mapCurrencyRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error adding currency:', error);
+      throw new Error('Failed to add currency');
+    }
+  }
+
+  async updateCurrency(id: string, updateData: any): Promise<any> {
+    try {
+      const now = new Date();
+      const fields: string[] = [];
+      const values: any[] = [];
+      let paramCount = 1;
+
+      // If this is being set as base currency, ensure no other base currency exists
+      if (updateData.isBase) {
+        const baseUpdateResult = await pool.query('UPDATE currencies SET is_base = false WHERE is_base = true');
+      }
+
+      // Note: Multiple currencies can be active at the same time
+      // No need to deactivate others when setting a currency as active
+
+      // Build dynamic update query
+      if (updateData.name !== undefined) {
+        fields.push(`name = $${paramCount++}`);
+        values.push(updateData.name);
+      }
+      if (updateData.code !== undefined) {
+        fields.push(`code = $${paramCount++}`);
+        values.push(updateData.code.toUpperCase());
+      }
+      if (updateData.symbol !== undefined) {
+        fields.push(`symbol = $${paramCount++}`);
+        values.push(updateData.symbol);
+      }
+      if (updateData.isActive !== undefined) {
+        fields.push(`is_active = $${paramCount++}`);
+        values.push(updateData.isActive);
+      }
+      if (updateData.exchangeRate !== undefined) {
+        fields.push(`exchange_rate = $${paramCount++}`);
+        values.push(updateData.exchangeRate);
+      }
+      if (updateData.isBase !== undefined) {
+        fields.push(`is_base = $${paramCount++}`);
+        values.push(updateData.isBase);
+      }
+
+      fields.push(`updated_at = $${paramCount++}`);
+      values.push(now);
+      values.push(id);
+
+      const query = `
+        UPDATE currencies 
+        SET ${fields.join(', ')} 
+        WHERE id = $${paramCount} 
+        RETURNING id, name, code, symbol, is_active, exchange_rate, is_base, created_at, updated_at
+      `;
+
+      const result = await pool.query(query, values);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Currency not found');
+      }
+      
+      return this.mapCurrencyRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error updating currency:', error);
+      throw new Error('Failed to update currency');
+    }
+  }
+
+  async deleteCurrency(id: string): Promise<void> {
+    try {
+      const result = await pool.query('DELETE FROM currencies WHERE id = $1', [id]);
+      
+      if (result.rowCount === 0) {
+        throw new Error('Currency not found');
+      }
+    } catch (error) {
+      console.error('Error deleting currency:', error);
+      throw new Error('Failed to delete currency');
+    }
+  }
+
+  async toggleCurrencyStatus(id: string): Promise<any> {
+    try {
+      // First, get the current status of the currency
+      const currentResult = await pool.query(
+        'SELECT is_active FROM currencies WHERE id = $1',
+        [id]
+      );
+      
+      if (currentResult.rows.length === 0) {
+        throw new Error('Currency not found');
+      }
+      
+      const currentStatus = currentResult.rows[0].is_active;
+      const newStatus = !currentStatus;
+      
+      // Note: Multiple currencies can be active at the same time
+      // No need to deactivate others when activating a currency
+      
+      // Now update the specific currency
+      const result = await pool.query(
+        'UPDATE currencies SET is_active = $1, updated_at = $2 WHERE id = $3 RETURNING *',
+        [newStatus, new Date(), id]
+      );
+      
+      if (result.rows.length === 0) {
+        throw new Error('Currency not found');
+      }
+      
+      return this.mapCurrencyRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error toggling currency status:', error);
+      throw new Error('Failed to toggle currency status');
+    }
+  }
+
+  private mapCurrencyRow(row: any): any {
+    return {
+      id: row.id,
+      name: row.name,
+      code: row.code,
+      symbol: row.symbol,
+      isActive: row.is_active,
+      exchangeRate: parseFloat(row.exchange_rate),
+      isBase: row.is_base,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
   // Settings methods for tax (percentage as string, e.g., '4')
   async getTax(): Promise<string> {
     const result = await pool.query('SELECT value FROM settings WHERE key = $1', ['tax']);
@@ -799,8 +1048,7 @@ export class DatabaseService {
 
   async createPaymentMethod(paymentMethod: Omit<PaymentMethod, 'id' | 'createdAt' | 'updatedAt'>): Promise<PaymentMethod> {
     try {
-      console.log('=== DataService: Creating Payment Method ===');
-      console.log('Input data:', paymentMethod);
+
       
       const query = `
         INSERT INTO payment_methods (name, code, description, is_active, config) 
@@ -816,19 +1064,16 @@ export class DatabaseService {
         JSON.stringify(paymentMethod.config)
       ];
       
-      console.log('SQL Query:', query);
-      console.log('SQL Values:', values);
+  
       
       const result = await pool.query(query, values);
       
-      console.log('Query result:', result.rows[0]);
       
       if (!result.rows[0]) {
         throw new Error('No rows returned after insert');
       }
       
       const createdPaymentMethod = this.mapPaymentMethodRow(result.rows[0]);
-      console.log('Mapped payment method:', createdPaymentMethod);
       
       return createdPaymentMethod;
     } catch (error: any) {
@@ -901,14 +1146,27 @@ export class DatabaseService {
 
   async deactivateAllOtherPaymentMethods(excludeId: string): Promise<void> {
     try {
-      console.log(`Deactivating all payment methods except ID: ${excludeId}`);
+      
+      // First, let's check what payment methods exist
+      const checkResult = await pool.query(
+        'SELECT id, name, is_active FROM payment_methods WHERE id != $1',
+        [excludeId]
+      );
+      
+      if (checkResult.rowCount === 0) {
+        return;
+      }
+      
+      // Now deactivate them
       const result = await pool.query(
         'UPDATE payment_methods SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id != $1',
         [excludeId]
       );
-      console.log(`Deactivated ${result.rowCount} other payment methods`);
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('Error deactivating other payment methods:', error);
+      console.error('Error details:', error.message);
+      console.error('Error code:', error.code);
       throw error;
     }
   }
@@ -1097,6 +1355,177 @@ export class DatabaseService {
 
   private camelToSnake(str: string): string {
     return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+  }
+
+  // Invoice Settings methods
+  async getInvoiceSettings(): Promise<any> {
+    try {
+      // Check if invoice_settings table exists, if not return defaults
+      const tableExists = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'invoice_settings'
+        );
+      `);
+
+      if (!tableExists.rows[0].exists) {
+        // Create table if it doesn't exist
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS invoice_settings (
+            id SERIAL PRIMARY KEY,
+            company_name VARCHAR(255) DEFAULT 'E-Shop',
+            company_tagline VARCHAR(255) DEFAULT 'Your Trusted Online Store',
+            company_email VARCHAR(255) DEFAULT 'contact@e-shop.com',
+            company_website VARCHAR(255) DEFAULT 'e-shop.com',
+            company_address VARCHAR(255) DEFAULT '123 Business Street',
+            company_city VARCHAR(255) DEFAULT 'Tunis',
+            company_country VARCHAR(255) DEFAULT 'Tunisia',
+            payment_text VARCHAR(255) DEFAULT 'Payment to E-Shop',
+            logo_url TEXT DEFAULT '',
+            primary_color VARCHAR(7) DEFAULT '#8B5CF6',
+            secondary_color VARCHAR(7) DEFAULT '#EC4899',
+            accent_color VARCHAR(7) DEFAULT '#3B82F6',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+
+        // Insert default settings
+        await pool.query(`
+          INSERT INTO invoice_settings DEFAULT VALUES;
+        `);
+      }
+
+      const result = await pool.query('SELECT * FROM invoice_settings ORDER BY id DESC LIMIT 1');
+      
+      if (result.rows.length === 0) {
+        // Insert default settings if none exist
+        await pool.query(`
+          INSERT INTO invoice_settings DEFAULT VALUES;
+        `);
+        const defaultResult = await pool.query('SELECT * FROM invoice_settings ORDER BY id DESC LIMIT 1');
+        return this.mapInvoiceSettingsRow(defaultResult.rows[0]);
+      }
+
+      return this.mapInvoiceSettingsRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error getting invoice settings:', error);
+      // Return default settings on error
+      return {
+        companyName: 'E-Shop',
+        companyTagline: 'Your Trusted Online Store',
+        companyEmail: 'contact@e-shop.com',
+        companyWebsite: 'e-shop.com',
+        companyAddress: '123 Business Street',
+        companyCity: 'Tunis',
+        companyCountry: 'Tunisia',
+        paymentText: 'Payment to E-Shop',
+        logoUrl: '',
+        primaryColor: '#8B5CF6',
+        secondaryColor: '#EC4899',
+        accentColor: '#3B82F6'
+      };
+    }
+  }
+
+  async updateInvoiceSettings(settings: any): Promise<any> {
+    try {
+      // First ensure table exists and has at least one record
+      const existingSettings = await this.getInvoiceSettings();
+      
+      const now = new Date();
+      let result;
+      
+      // Check if we have an existing record to update
+      const checkResult = await pool.query('SELECT id FROM invoice_settings ORDER BY id DESC LIMIT 1');
+      
+      if (checkResult.rows.length > 0) {
+        // Update existing record
+        result = await pool.query(`
+          UPDATE invoice_settings 
+          SET 
+            company_name = $1,
+            company_tagline = $2,
+            company_email = $3,
+            company_website = $4,
+            company_address = $5,
+            company_city = $6,
+            company_country = $7,
+            payment_text = $8,
+            logo_url = $9,
+            primary_color = $10,
+            secondary_color = $11,
+            accent_color = $12,
+            updated_at = $13
+          WHERE id = $14
+          RETURNING *
+        `, [
+          settings.companyName || 'E-Shop',
+          settings.companyTagline || 'Your Trusted Online Store',
+          settings.companyEmail || 'contact@e-shop.com',
+          settings.companyWebsite || 'e-shop.com',
+          settings.companyAddress || '123 Business Street',
+          settings.companyCity || 'Tunis',
+          settings.companyCountry || 'Tunisia',
+          settings.paymentText || 'Payment to E-Shop',
+          settings.logoUrl || '',
+          settings.primaryColor || '#8B5CF6',
+          settings.secondaryColor || '#EC4899',
+          settings.accentColor || '#3B82F6',
+          now,
+          checkResult.rows[0].id
+        ]);
+      } else {
+        // Insert new record if none exists
+        result = await pool.query(`
+          INSERT INTO invoice_settings (
+            company_name, company_tagline, company_email, company_website,
+            company_address, company_city, company_country, payment_text,
+            logo_url, primary_color, secondary_color, accent_color,
+            created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          RETURNING *
+        `, [
+          settings.companyName || 'E-Shop',
+          settings.companyTagline || 'Your Trusted Online Store',
+          settings.companyEmail || 'contact@e-shop.com',
+          settings.companyWebsite || 'e-shop.com',
+          settings.companyAddress || '123 Business Street',
+          settings.companyCity || 'Tunis',
+          settings.companyCountry || 'Tunisia',
+          settings.paymentText || 'Payment to E-Shop',
+          settings.logoUrl || '',
+          settings.primaryColor || '#8B5CF6',
+          settings.secondaryColor || '#EC4899',
+          settings.accentColor || '#3B82F6',
+          now,
+          now
+        ]);
+      }
+
+      return this.mapInvoiceSettingsRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error updating invoice settings:', error);
+      throw error;
+    }
+  }
+
+  private mapInvoiceSettingsRow(row: any): any {
+    return {
+      companyName: row.company_name,
+      companyTagline: row.company_tagline,
+      companyEmail: row.company_email,
+      companyWebsite: row.company_website,
+      companyAddress: row.company_address,
+      companyCity: row.company_city,
+      companyCountry: row.company_country,
+      paymentText: row.payment_text,
+      logoUrl: row.logo_url,
+      primaryColor: row.primary_color,
+      secondaryColor: row.secondary_color,
+      accentColor: row.accent_color
+    };
   }
 }
 

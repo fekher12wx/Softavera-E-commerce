@@ -34,6 +34,8 @@ export interface Product {
   updatedAt?: string;
   subcategory?: string;
   taxId?: string; // Reference to the tax from the taxes table
+  taxRate?: number; // The actual tax rate percentage
+  taxName?: string; // The tax name (e.g., "20%", "5%")
 }
 
 export interface Order {
@@ -79,14 +81,26 @@ export interface PaymentMethod {
   updatedAt: string;
 }
 
-export type TabType = 'users' | 'products' | 'orders' | 'taxes' | 'paymentMethods';
-export type ModalType = 'add' | 'edit' | 'view';
+export interface Currency {
+  id: string;
+  name: string;
+  code: string; // 'USD', 'EUR', 'TND'
+  symbol: string; // '$', '€', 'DT'
+  isActive: boolean;
+  exchangeRate: number; // Rate relative to base currency
+  isBase: boolean; // Whether this is the base currency
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TabType = 'users' | 'products' | 'orders' | 'taxes' | 'paymentMethods' | 'currency' | 'invoiceSettings';
+export type ModalType = 'add' | 'edit' | 'view' | 'add-tax';
 
 interface ModalProps {
   modalType: ModalType;
   showModal: boolean;
   setShowModal: (show: boolean) => void;
-  selectedItem: User | Product | Order | Tax | PaymentMethod | null;
+  selectedItem: User | Product | Order | Tax | PaymentMethod | Currency | null;
   handleSave: (formData: any) => Promise<void>;
   activeTab: TabType;
   users: User[];
@@ -94,4 +108,5 @@ interface ModalProps {
   orders: Order[];
   taxes: Tax[];
   paymentMethods: PaymentMethod[];
+  currencies: Currency[];
 } 

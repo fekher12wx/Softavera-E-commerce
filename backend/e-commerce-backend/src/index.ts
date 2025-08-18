@@ -36,6 +36,15 @@ app.use('/api/products', productRoute);
 app.use('/api/payments', paymentRoute);
 app.use('/api/orders', orderRoute); 
 
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'E-commerce API is running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+});
+
 app.get('/', (req, res) => {
   res.json({
     message: 'Simple E-commerce API',
@@ -83,6 +92,25 @@ export function broadcast(message: string) {
 // --- End WebSocket server setup ---
 
 import './listener';
+import dataService from './services/dataService';
+
+// Function to ensure default tax exists
+const ensureDefaultTax = async () => {
+  try {
+    // Check if 10% tax exists
+    const defaultTax = await dataService.getTaxByRate(10);
+    if (!defaultTax) {
+      // Create default 10% tax
+      await dataService.createTax({
+        name: '10%',
+        rate: 10,
+        isActive: true
+      });
+    } else {
+    }
+  } catch (error) {
+  }
+};
 
 server.listen(PORT, async () => {
   console.log(`✅ Server is running on port ${PORT}`);
@@ -91,6 +119,9 @@ server.listen(PORT, async () => {
   
   // Check Redis health on startup
   await checkRedisHealth();
+  
+  // Ensure default tax exists
+  await ensureDefaultTax();
 });
 
 export { server };

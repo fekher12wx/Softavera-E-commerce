@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { User, Product, Order, Tax, PaymentMethod, TabType, ModalType } from './adminTypes';
+import { User, Product, Order, Tax, PaymentMethod, Currency, TabType, ModalType } from './adminTypes';
 import { getCategories, CategoryType } from '../../lib/categories';
 import { getCountries } from '../../lib/countries';
 import { useCurrency } from '../../lib/currencyContext';
@@ -41,7 +41,6 @@ const FormField = React.memo(({
           className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl text-sm font-medium transition-all duration-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 focus:outline-none disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed shadow-sm hover:border-gray-300"
           {...props}
         >
-          <option value="">{`Select ${label.toLowerCase()}`}</option>
           {options.map((opt: any) => (
             <option key={opt.value || opt} value={opt.value || opt}>
               {opt.label || opt}
@@ -99,7 +98,8 @@ interface ModalProps {
   modalType: ModalType;
   showModal: boolean;
   setShowModal: (show: boolean) => void;
-  selectedItem: User | Product | Order | Tax | PaymentMethod | null;
+  setModalType: (type: ModalType) => void;
+  selectedItem: User | Product | Order | Tax | PaymentMethod | Currency | null;
   handleSave: (formData: any) => Promise<void>;
   activeTab: TabType;
   users: User[];
@@ -107,12 +107,14 @@ interface ModalProps {
   orders: Order[];
   taxes: Tax[];
   paymentMethods: PaymentMethod[];
+  currencies: Currency[];
 }
 
 function Modal({
   modalType,
   showModal,
   setShowModal,
+  setModalType,
   selectedItem,
   handleSave,
   activeTab,
@@ -121,6 +123,7 @@ function Modal({
   orders,
   taxes,
   paymentMethods,
+  currencies,
 }: ModalProps) {
   const { getCurrencySymbol } = useCurrency();
   const { t, language } = useLanguage();
@@ -138,6 +141,19 @@ function Modal({
           zipCode: item?.address?.zipCode || '',
           country: item?.address?.country || '',
         },
+      };
+    } else if (activeTab === 'products') {
+      // Initialize product fields with proper defaults
+      return {
+        name: item?.name || '',
+        price: item?.price || 0,
+        description: item?.description || '',
+        category: item?.category || '',
+        subcategory: item?.subcategory || '',
+        stock: item?.stock || 0,
+        taxId: item?.taxId || '', // Ensure taxId is properly set
+        image: item?.image || '',
+        ...item
       };
     } else if (activeTab === 'taxes') {
       // Initialize tax fields with proper defaults
@@ -160,12 +176,28 @@ function Modal({
         },
         ...item
       };
+    } else if (activeTab === 'currency') {
+      // Initialize currency fields with proper defaults
+      return {
+        name: item?.name || '',
+        code: item?.code || '',
+        symbol: item?.symbol || '',
+        isActive: item?.isActive !== undefined ? item.isActive : true,
+        exchangeRate: item?.exchangeRate || 1,
+        isBase: item?.isBase || false,
+        ...item
+      };
     }
     return item || {};
   }, [activeTab]);
 
   const initialFormData = useMemo(() => getInitialFormData(selectedItem), [selectedItem, getInitialFormData]);
   const [formData, setFormData] = useState<any>(initialFormData);
+  
+  // Debug logging
+  useEffect(() => {
+   
+  }, [selectedItem, initialFormData, formData]);
   const [subcategoryOptions, setSubcategoryOptions] = useState<string[]>([]);
   const modalRef = useRef<HTMLDivElement>(null);
   
@@ -226,7 +258,7 @@ function Modal({
       setFormData((prev: any) => {
         const updated = {
           ...prev,
-          [name]: ['price', 'stock', 'total', 'rate'].includes(name) ? parseFloat(value) || 0 : value,
+          [name]: ['price', 'stock', 'total', 'rate', 'exchangeRate'].includes(name) ? parseFloat(value) || 0 : value,
         };
         return updated;
       });
@@ -423,19 +455,43 @@ function Modal({
               onChange={handleChange}
               isViewMode={isViewMode}
             />
-            <FormField 
-              label={t('tax') || 'Tax'} 
-              name="taxId" 
-              options={taxes.filter(tax => tax.isActive).map(tax => ({ 
-                value: tax.id, 
-                label: `${tax.rate}%` 
-              }))} 
-              required={true}
-              disabled={false}
-              value={formData.taxId || ''}
-              onChange={handleChange}
-              isViewMode={isViewMode}
-            />
+            <div className="space-y-2">
+              <FormField 
+                label={t('tax') || 'Tax Rate'} 
+                name="taxId" 
+                options={[
+                  { value: '', label: 'Default 10% Tax (Auto-assigned)' },
+                  ...taxes.filter(tax => tax.isActive).map(tax => ({ 
+                    value: tax.id, 
+                    label: `${tax.rate}%` 
+                  }))
+                ]} 
+                required={false}
+                disabled={false}
+                value={formData.taxId || ''}
+                onChange={handleChange}
+                isViewMode={isViewMode}
+              />
+              {modalType === 'add' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalType('add-tax');
+                    setFormData({ rate: '', isActive: true });
+                  }}
+                  className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center space-x-1"
+                >
+                  <span>+</span>
+                  <span>{t('create_new_tax') || 'Create New Tax Rate'}</span>
+                </button>
+              )}
+              {modalType === 'add-tax' && (
+                <div className="text-sm text-green-600 bg-green-50 p-2 rounded-lg border border-green-200">
+                  <span>💡</span>
+                  <span>{t('create_tax_tip') || 'Create a new tax rate that will be available for products'}</span>
+                </div>
+              )}
+            </div>
             <FormField 
               label={t('description')} 
               name="description" 
@@ -506,6 +562,50 @@ function Modal({
       </SectionCard>
     </div>
   ), [t, formData.isActive, formData.rate, isViewMode, handleChange, SectionCard]);
+
+  const renderCreateTaxFields = useCallback(() => (
+    <div className="space-y-6">
+      <SectionCard title={t('create_new_tax') || 'Create New Tax Rate'}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FormField 
+            label={t('rate') || 'Rate (%)'} 
+            name="rate" 
+            type="number" 
+            min="0" 
+            max="100" 
+            step="0.01" 
+            required 
+            disabled={false}
+            value={formData.rate || ''}
+            onChange={handleChange}
+            isViewMode={false}
+          />
+          <div className="md:col-span-2">
+            <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
+              <input
+                type="checkbox"
+                name="isActive"
+                checked={formData.isActive !== false}
+                onChange={(e) => {
+                  setFormData((prev: any) => ({ ...prev, isActive: e.target.checked }));
+                }}
+                disabled={false}
+                className="w-5 h-5 text-purple-600 bg-white border-2 border-gray-300 rounded focus:ring-purple-500 focus:ring-2 focus:border-purple-500 transition-all duration-200 disabled:opacity-50"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-700">
+                  {t('active') || 'Active'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  Active taxes will be available for use in orders
+                </span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </SectionCard>
+    </div>
+  ), [t, formData.isActive, formData.rate, handleChange, SectionCard]);
 
   const renderPaymentMethodFields = useCallback(() => {
     const getProviderSpecificFields = () => {
@@ -771,106 +871,115 @@ function Modal({
             {/* Provider-specific Configuration Fields */}
             {getProviderSpecificFields()}
 
-            {/* Test and Validate Buttons */}
-            {!isViewMode && (
-              <div className="flex space-x-4 mt-6">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const response = await fetch(`http://localhost:3001/api/payment-methods/${selectedItem?.id}/validate`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                        },
-                        body: JSON.stringify({ config: formData.config })
-                      });
-                      
-                      const result = await response.json();
-                      
-                      if (result.valid) {
-                        toast.success('Configuration is valid!');
-                      } else {
-                        toast.error(`Validation failed: ${result.errors.join(', ')}`);
-                      }
-                    } catch (error) {
-                      toast.error('Failed to validate configuration');
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-                >
-                  Validate Configuration
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const response = await fetch(`http://localhost:3001/api/payment-methods/${selectedItem?.id}/test`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                        }
-                      });
-                      
-                      const result = await response.json();
-                      
-                      if (result.success) {
-                        toast.success(result.message);
-                      } else {
-                        toast.error(result.message);
-                      }
-                    } catch (error) {
-                      toast.error('Failed to test connection');
-                    }
-                  }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200"
-                >
-                  Test Connection
-                </button>
-              </div>
-            )}
+           
 
-            {/* Custom Configuration */}
-            <div className="mt-6">
-              <label className="block text-sm font-semibold text-gray-800 mb-2">
-                Custom Configuration (JSON)
-              </label>
-              <textarea
-                value={JSON.stringify(formData.config || {}, null, 2)}
-                onChange={(e) => {
-                  try {
-                    const parsed = JSON.parse(e.target.value);
-                    setFormData((prev: any) => ({ 
-                      ...prev, 
-                      config: parsed 
-                    }));
-                  } catch (error) {
-                    // Don't update if invalid JSON
-                  }
-                }}
-                disabled={isViewMode}
-                className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl text-sm font-mono transition-all duration-300 focus:border-violet-500 focus:ring-violet-500/10 focus:outline-none disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed hover:border-gray-300"
-                rows={6}
-                placeholder='{
-  "apiKey": "your-api-key",
-  "merchantId": "your-merchant-id",
-  "environment": "test"
-}'
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                You can add any additional configuration fields as needed
-              </p>
-            </div>
+            
           </div>
         </SectionCard>
       </div>
     );
   }, [t, formData.isActive, formData.name, formData.code, formData.description, formData.config, isViewMode, handleChange, SectionCard, selectedItem]);
 
-    const renderOrderFields = useCallback(() => {
+  const renderCurrencyFields = useCallback(() => {
+    return (
+      <div className="space-y-6">
+        <SectionCard title="Currency Information">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField 
+              label="Name" 
+              name="name" 
+              type="text"
+              required 
+              disabled={isViewMode}
+              value={formData.name || ''}
+              onChange={handleChange}
+              isViewMode={isViewMode}
+              placeholder="e.g., US Dollar, Euro, Tunisian Dinar"
+            />
+            <FormField 
+              label="Code" 
+              name="code" 
+              type="text"
+              required 
+              disabled={isViewMode}
+              value={formData.code || ''}
+              onChange={handleChange}
+              isViewMode={isViewMode}
+              placeholder="e.g., USD, EUR, TND"
+            />
+            <FormField 
+              label="Symbol" 
+              name="symbol" 
+              type="text"
+              required 
+              disabled={isViewMode}
+              value={formData.symbol || ''}
+              onChange={handleChange}
+              isViewMode={isViewMode}
+              placeholder="e.g., $, €, DT"
+            />
+            <FormField 
+              label="Exchange Rate" 
+              name="exchangeRate" 
+              type="number"
+              step="0.0001"
+              disabled={isViewMode}
+              value={formData.exchangeRate || 1}
+              onChange={handleChange}
+              isViewMode={isViewMode}
+              placeholder="1.0000"
+            />
+            <div className="md:col-span-2">
+              <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                <input
+                  type="checkbox"
+                  name="isActive"
+                  checked={formData.isActive !== false}
+                  onChange={(e) => {
+                    setFormData((prev: any) => ({ ...prev, isActive: e.target.checked }));
+                  }}
+                  disabled={isViewMode}
+                  className="w-5 h-5 text-purple-600 bg-white border-2 border-gray-300 rounded focus:ring-purple-500 focus:ring-2 focus:border-purple-500 transition-all duration-200 disabled:opacity-50"
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-700">
+                    Active
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Active currencies will be available for use. Only one currency can be active at a time.
+                  </span>
+                </div>
+              </label>
+            </div>
+            <div className="md:col-span-2">
+              <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                <input
+                  type="checkbox"
+                  name="isBase"
+                  checked={formData.isBase || false}
+                  onChange={(e) => {
+                    setFormData((prev: any) => ({ ...prev, isBase: e.target.checked }));
+                  }}
+                  disabled={isViewMode}
+                  className="w-5 h-5 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-700">
+                    Base Currency
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    This currency will be used as the base for exchange rate calculations. Only one currency can be base.
+                  </span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }, [formData.isActive, formData.name, formData.code, formData.symbol, formData.exchangeRate, formData.isBase, isViewMode, handleChange, SectionCard]);
+
+  const renderOrderFields = useCallback(() => {
     // Helper function to get nested value from formData
     const getNestedValue = (obj: any, path: string) => {
       return path.split('.').reduce((current, key) => current?.[key], obj) || '';
@@ -1131,10 +1240,10 @@ function Modal({
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">
-                  {modalType === 'add' ? 'Create New' : modalType === 'edit' ? 'Edit' : 'View Details'} 
+                  {modalType === 'add' ? 'Create New' : modalType === 'edit' ? 'Edit' : modalType === 'add-tax' ? 'Create New Tax' : 'View Details'} 
                 </h2>
                 <p className="text-white text-sm font-semibold">
-                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1, -1)} Management
+                  {modalType === 'add-tax' ? 'Tax Rate' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1, -1)} Management
                 </p>
               </div>
             </div>
@@ -1153,12 +1262,14 @@ function Modal({
         
         {/* Content */}
         <div className={`overflow-y-auto ${!isViewMode ? 'p-6' : ''}`} style={{maxHeight: isOrderInvoice ? 'calc(90vh - 180px)' : 'calc(85vh - 180px)'}}>
-          {activeTab === 'users' && renderUserFields()}
-          {activeTab === 'products' && renderProductFields()}
-          {activeTab === 'taxes' && renderTaxFields()}
-          {activeTab === 'paymentMethods' && renderPaymentMethodFields()}
-          {activeTab === 'orders' && isViewMode && renderOrderInvoice()}
-          {activeTab === 'orders' && !isViewMode && (
+          {modalType === 'add-tax' && renderCreateTaxFields()}
+          {modalType !== 'add-tax' && activeTab === 'users' && renderUserFields()}
+          {modalType !== 'add-tax' && activeTab === 'products' && renderProductFields()}
+          {modalType !== 'add-tax' && activeTab === 'taxes' && renderTaxFields()}
+          {modalType !== 'add-tax' && activeTab === 'paymentMethods' && renderPaymentMethodFields()}
+          {modalType !== 'add-tax' && activeTab === 'currency' && renderCurrencyFields()}
+          {modalType !== 'add-tax' && activeTab === 'orders' && isViewMode && renderOrderInvoice()}
+          {modalType !== 'add-tax' && activeTab === 'orders' && !isViewMode && (
             <div className="p-6">
               {renderOrderFields()}
             </div>

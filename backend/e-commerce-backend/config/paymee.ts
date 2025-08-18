@@ -34,12 +34,9 @@ export async function getPaymeeClient() {
   // Add request interceptor for logging
   paymeeClient.interceptors.request.use(
     (config) => {
-      console.log(`Paymee API Request: ${config.method?.toUpperCase()} ${config.url}`);
-      console.log('Request data:', config.data);
       return config;
     },
     (error) => {
-      console.error('Paymee API Request Error:', error);
       return Promise.reject(error);
     }
   );
@@ -47,12 +44,9 @@ export async function getPaymeeClient() {
   // Add response interceptor for logging
   paymeeClient.interceptors.response.use(
     (response) => {
-      console.log(`Paymee API Response: ${response.status} ${response.statusText}`);
-      console.log('Response data:', response.data);
       return response;
     },
     (error) => {
-      console.error('Paymee API Response Error:', error.response?.data || error.message);
       return Promise.reject(error);
     }
   );

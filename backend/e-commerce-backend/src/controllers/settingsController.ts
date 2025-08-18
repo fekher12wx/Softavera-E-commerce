@@ -6,9 +6,9 @@ class SettingsController {
   async getActivePaymentMethod(req: Request, res: Response) {
     try {
       const method = await dataService.getActivePaymentMethod();
-      res.json({ activePaymentMethod: method });
+      return res.json({ activePaymentMethod: method });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to get active payment method' });
+      return res.status(500).json({ error: 'Failed to get active payment method' });
     }
   }
 
@@ -32,9 +32,9 @@ class SettingsController {
   async getCurrency(req: Request, res: Response) {
     try {
       const currency = await dataService.getCurrency();
-      res.json({ currency });
+      return res.json({ currency });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to get currency' });
+      return res.status(500).json({ error: 'Failed to get currency' });
     }
   }
 
@@ -54,12 +54,97 @@ class SettingsController {
     }
   }
 
+  // Get all available currencies
+  async getCurrencies(req: Request, res: Response) {
+    try {
+      const currencies = await dataService.getCurrencies();
+      return res.json({ currencies });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to get currencies' });
+    }
+  }
+
+  // Get base currency
+  async getBaseCurrency(req: Request, res: Response) {
+    try {
+      const baseCurrency = await dataService.getBaseCurrency();
+      return res.json({ baseCurrency });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to get base currency' });
+    }
+  }
+
+  // Add new currency
+  async addCurrency(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user || String(req.user.role).toUpperCase() !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admins only' });
+      }
+      const { name, code, symbol, isActive, exchangeRate, isBase } = req.body;
+      
+      if (!name || !code || !symbol) {
+        return res.status(400).json({ error: 'Name, code, and symbol are required' });
+      }
+      
+      const currency = await dataService.addCurrency({ name, code, symbol, isActive, exchangeRate, isBase });
+      return res.status(201).json({ message: 'Currency added successfully', currency });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to add currency' });
+    }
+  }
+
+  // Update currency
+  async updateCurrency(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user || String(req.user.role).toUpperCase() !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admins only' });
+      }
+      const { id } = req.params;
+      const updateData = req.body;
+      
+      const currency = await dataService.updateCurrency(id, updateData);
+      return res.json({ message: 'Currency updated successfully', currency });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to update currency' });
+    }
+  }
+
+  // Delete currency
+  async deleteCurrency(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user || String(req.user.role).toUpperCase() !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admins only' });
+      }
+      const { id } = req.params;
+      
+      await dataService.deleteCurrency(id);
+      return res.json({ message: 'Currency deleted successfully' });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to delete currency' });
+    }
+  }
+
+  // Toggle currency status
+  async toggleCurrencyStatus(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user || String(req.user.role).toUpperCase() !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden: Admins only' });
+      }
+      const { id } = req.params;
+      
+      const currency = await dataService.toggleCurrencyStatus(id);
+      return res.json({ message: 'Currency status updated', currency });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to toggle currency status' });
+    }
+  }
+
   async getTax(req: Request, res: Response) {
     try {
       const tax = await dataService.getTax();
-      res.json({ tax });
+      return res.json({ tax });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to get tax' });
+      return res.status(500).json({ error: 'Failed to get tax' });
     }
   }
 
@@ -82,18 +167,18 @@ class SettingsController {
   async getTaxes(req: Request, res: Response) {
     try {
       const taxes = await dataService.getTaxes();
-      res.json({ taxes });
+      return res.json({ taxes });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to get taxes' });
+      return res.status(500).json({ error: 'Failed to get taxes' });
     }
   }
 
   async getActiveTaxes(req: Request, res: Response) {
     try {
       const taxes = await dataService.getActiveTaxes();
-      res.json({ taxes });
+      return res.json({ taxes });
     } catch (error) {
-      res.status(500).json({ error: 'Failed to get active taxes' });
+      return res.status(500).json({ error: 'Failed to get active taxes' });
     }
   }
 }

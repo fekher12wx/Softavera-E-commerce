@@ -22,7 +22,10 @@ const TaxesTable: React.FC<TaxesTableProps> = ({
   const [itemsPerPage, setItemsPerPage] = useState(15);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredTaxes = taxes.filter(tax =>
+  // Ensure taxes is always an array
+  const taxesArray = Array.isArray(taxes) ? taxes : [];
+  
+  const filteredTaxes = taxesArray.filter(tax =>
     tax.rate !== undefined && tax.rate !== null && 
     tax.rate.toString().includes(searchTerm)
   );

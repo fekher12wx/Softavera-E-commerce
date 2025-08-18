@@ -121,5 +121,4 @@ export function logPriceCalculation(
   context: string,
   breakdown: PriceBreakdown | ReturnType<typeof calculateCartTotals>
 ): void {
-  console.log(`💰 Price Calculation [${context}]:`, breakdown);
 }

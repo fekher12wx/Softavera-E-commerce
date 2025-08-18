@@ -37,7 +37,6 @@ export const TaxProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setLoading(true);
       setError(null);
       
-      console.log('🔄 Fetching taxes from backend...');
       
       // First check if backend is accessible
       const healthCheck = await fetch('http://localhost:3001/api/health', { 
@@ -66,10 +65,7 @@ export const TaxProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         })
       ]);
 
-      console.log('📊 Tax responses:', {
-        allTaxes: allTaxesRes.status,
-        activeTaxes: activeTaxesRes.status
-      });
+    
 
       if (allTaxesRes.ok && activeTaxesRes.ok) {
         const [allTaxesData, activeTaxesData] = await Promise.all([
@@ -77,11 +73,7 @@ export const TaxProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           activeTaxesRes.json()
         ]);
 
-        console.log('✅ Tax data received:', {
-          allTaxes: allTaxesData.length,
-          activeTaxes: activeTaxesData.length
-        });
-
+    
         setTaxes(allTaxesData);
         setActiveTaxes(activeTaxesData);
         
@@ -92,10 +84,7 @@ export const TaxProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // If only active taxes endpoint works, use that
         const activeTaxesData = await activeTaxesRes.json();
         
-        console.log('⚠️ Only active taxes endpoint working:', {
-          activeTaxes: activeTaxesData.length
-        });
-
+       
         setTaxes(activeTaxesData);
         setActiveTaxes(activeTaxesData);
         setDefaultTax(activeTaxesData[0] || null);
@@ -131,7 +120,6 @@ export const TaxProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
          updatedAt: new Date().toISOString()
        };
       
-      console.log('🔄 Using fallback tax:', fallbackTax);
       
       setTaxes([fallbackTax]);
       setActiveTaxes([fallbackTax]);
@@ -183,7 +171,6 @@ export const TaxProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Add retry functionality
   const retryFetch = () => {
-    console.log('🔄 Retrying tax fetch...');
     fetchTaxes();
   };
 

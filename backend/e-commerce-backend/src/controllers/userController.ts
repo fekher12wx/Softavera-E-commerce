@@ -126,8 +126,7 @@ export class UserController {
       const { id } = req.params;
       const updates = req.body;
       
-      console.log('Updating user with ID:', id);
-      console.log('Update data received:', updates);
+   
 
       // Convert flat address fields to address object
       const addressFields = ['street', 'city', 'zipCode', 'country'];
@@ -146,20 +145,57 @@ export class UserController {
         };
       }
 
-      console.log('Processed update data:', updateData);
       const user = await dataService.updateUser(id, updateData);
 
       if (!user) {
-        console.log('User not found with ID:', id);
         res.status(404).json({ error: 'User not found' });
         return;
       }
 
-      console.log('User updated successfully:', user);
       res.json(user);
     } catch (error) {
       console.error('Update user error:', error);
       res.status(500).json({ error: 'Failed to update user' });
+    }
+  }
+
+  async checkUserDeletion(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      
+      const result = await dataService.deleteUser(id);
+      
+      if (!result.userExists) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      
+      if (!result.success && result.dependencies) {
+        const { orders, reviews } = result.dependencies;
+        let reason = 'User has ';
+        const reasons = [];
+        
+        if (orders && orders.length > 0) {
+          reasons.push(`${orders.length} order(s)`);
+        }
+        if (reviews && reviews.length > 0) {
+          reasons.push(`${reviews.length} review(s)`);
+        }
+        
+        reason += `${reasons.join(' and ')}`;
+        
+        res.json({ 
+          canDelete: false, 
+          reason,
+          dependencies: result.dependencies
+        });
+        return;
+      }
+      
+      res.json({ canDelete: true });
+    } catch (error) {
+      console.error('Error checking user deletion:', error);
+      res.status(500).json({ error: 'Failed to check user deletion' });
     }
   }
 
@@ -168,15 +204,43 @@ export class UserController {
       const { id } = req.params;
 
 
-      const deleted = await dataService.deleteUser(id);
+      const result = await dataService.deleteUser(id);
 
-      if (!deleted) {
-        res.status(404).json({ error: 'User not found' });
+      if (!result.success) {
+        if (!result.userExists) {
+          res.status(404).json({ error: 'User not found' });
+          return;
+        }
+        
+        if (result.dependencies) {
+          const { orders, reviews } = result.dependencies;
+          let message = 'Cannot delete user. ';
+          const reasons = [];
+          
+          if (orders && orders.length > 0) {
+            reasons.push(`${orders.length} order(s)`);
+          }
+          if (reviews && reviews.length > 0) {
+            reasons.push(`${reviews.length} review(s)`);
+          }
+          
+          message += `User has ${reasons.join(' and ')}. Please delete these first or reassign them.`;
+          
+          res.status(400).json({ 
+            error: message,
+            dependencies: result.dependencies
+          });
+          return;
+        }
+        
+        // This should not happen with the new logic, but handle it gracefully
+        res.status(500).json({ error: 'Failed to delete user' });
         return;
       }
 
       res.json({ message: 'User deleted successfully' });
     } catch (error) {
+      console.error('Error deleting user:', error);
       res.status(500).json({ error: 'Failed to delete user' });
     }
   }
