@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import AuthModal from './AuthModal';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useLanguage } from '../lib/languageContext';
+import { useLogo } from '../app/contexts/LogoContext';
 
 interface InvoiceSettings {
   companyName: string;
@@ -51,6 +52,7 @@ type RegForm = {
 const Header: React.FC = () => {
   const { itemCount } = useCart();
   const { t } = useLanguage();
+  const { currentLogo } = useLogo(); // Use global logo context
   const [showAuth, setShowAuth] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [email, setEmail] = useState('');
@@ -61,20 +63,6 @@ const Header: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({
-    companyName: 'E-Shop',
-    companyTagline: 'Your Trusted Online Store',
-    companyEmail: 'contact@e-shop.com',
-    companyWebsite: 'e-shop.com',
-    companyAddress: '123 Business Street',
-    companyCity: 'Tunis',
-    companyCountry: 'Tunisia',
-    paymentText: 'Payment to E-Shop',
-    logoUrl: '',
-    primaryColor: '#8B5CF6',
-    secondaryColor: '#EC4899',
-    accentColor: '#3B82F6'
-  });
   const router = useRouter();
 
   const [regForm, setRegForm] = useState<RegForm>({
@@ -87,23 +75,6 @@ const Header: React.FC = () => {
     country: '',
     subscribe: false,
   });
-
-  // Load invoice settings when component mounts
-  useEffect(() => {
-    const loadInvoiceSettings = async () => {
-      try {
-        const response = await fetch('http://localhost:3001/api/settings/invoice');
-        if (response.ok) {
-          const data = await response.json();
-          setInvoiceSettings(data.settings);
-        }
-      } catch (error) {
-        console.error('Failed to load invoice settings:', error);
-      }
-    };
-
-    loadInvoiceSettings();
-  }, []);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -316,20 +287,20 @@ const Header: React.FC = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              {invoiceSettings.logoUrl ? (
+              {currentLogo ? (
                 <div className="w-10 h-10 rounded-xl overflow-hidden border-2 border-white/20 bg-white/10">
-                  <img src={invoiceSettings.logoUrl} alt="Company Logo" className="w-full h-full object-contain" />
+                  <img src={currentLogo} alt="Company Logo" className="w-full h-full object-contain" />
                 </div>
               ) : (
                 <div 
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-xl border-2 border-white/20 bg-white/10"
-                  style={{ backgroundColor: invoiceSettings.primaryColor }}
+                  style={{ backgroundColor: '#8B5CF6' }}
                 >
-                  {invoiceSettings.companyName.charAt(0) || 'E'}
+                  E
                 </div>
               )}
               <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-300 via-orange-300 to-red-300 bg-clip-text text-transparent">
-                {invoiceSettings.companyName || 'E-Shop'}
+                E-Shop
               </h1>
             </div>
             <div className="flex items-center space-x-8">
@@ -347,27 +318,27 @@ const Header: React.FC = () => {
         <div className="flex justify-between items-center">
           {/* Logo */}
           <Link href="/" className="group flex items-center space-x-3 hover:scale-105 transition-transform">
-            {invoiceSettings.logoUrl ? (
+            {currentLogo ? (
               <div className="w-10 h-10 rounded-xl overflow-hidden border-2 border-white/20 bg-white/10">
-                <img src={invoiceSettings.logoUrl} alt="Company Logo" className="w-full h-full object-contain" />
+                <img src={currentLogo} alt="Company Logo" className="w-full h-full object-contain" />
               </div>
             ) : (
               <div 
                 className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-xl border-2 border-white/20 bg-white/10"
-                style={{ backgroundColor: invoiceSettings.primaryColor }}
+                style={{ backgroundColor: '#8B5CF6' }}
               >
-                {invoiceSettings.companyName.charAt(0) || 'E'}
+                E
               </div>
             )}
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-300 via-orange-300 to-red-300 bg-clip-text text-transparent">
-                {invoiceSettings.companyName || 'E-Shop'}
+                E-Shop
               </h1>
-              {invoiceSettings.companyTagline && (
+              {/* invoiceSettings.companyTagline && (
                 <p className="text-xs text-white/80 -mt-1">
                   {invoiceSettings.companyTagline}
                 </p>
-              )}
+              ) */}
             </div>
           </Link>
 

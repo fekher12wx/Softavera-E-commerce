@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Building, Palette, Eye, Upload, Save, RotateCcw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useLogo } from '../contexts/LogoContext';
 
 interface InvoiceSettings {
   companyName: string;
@@ -15,9 +16,13 @@ interface InvoiceSettings {
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
+  fiscalNumber: string;
+  taxRegistrationNumber: string;
+  siretNumber: string;
 }
 
-const InvoiceSettings = () => {
+const InvoiceSettings: React.FC = () => {
+  const { updateLogo } = useLogo(); // Use global logo context
   const [settings, setSettings] = useState<InvoiceSettings>({
     companyName: 'E-Shop',
     companyTagline: 'Your Trusted Online Store',
@@ -30,7 +35,10 @@ const InvoiceSettings = () => {
     logoUrl: '',
     primaryColor: '#8B5CF6',
     secondaryColor: '#EC4899',
-    accentColor: '#3B82F6'
+    accentColor: '#3B82F6',
+    fiscalNumber: '',
+    taxRegistrationNumber: '',
+    siretNumber: ''
   });
 
   const [logoPreview, setLogoPreview] = useState<string>('');
@@ -49,9 +57,11 @@ const InvoiceSettings = () => {
       if (response.ok) {
         const data = await response.json();
         setSettings(data.settings);
-        // If there's a saved logo, load it
+        // If there's a saved logo, load it and update header
         if (data.settings.logoUrl) {
           setLogoPreview(data.settings.logoUrl);
+          // Update header logo with loaded settings
+          updateLogo(data.settings.logoUrl);
         }
       }
     } catch (error) {
@@ -62,8 +72,44 @@ const InvoiceSettings = () => {
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select a valid image file (PNG, JPG, JPEG, GIF)');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+      
       const reader = new FileReader();
-      reader.onload = (e) => setLogoPreview(e.target?.result as string);
+      
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (result && result.startsWith('data:image/')) {
+          // Create a new image to test if it loads correctly
+          const img = new Image();
+          img.onload = () => {
+            setLogoPreview(result);
+            // Update header logo immediately for real-time preview
+            updateLogo(result);
+            toast.success('Logo loaded successfully!');
+          };
+          img.onerror = () => {
+            toast.error('Failed to load image. Please try another file.');
+          };
+          img.src = result;
+        } else {
+          toast.error('Failed to read image file');
+        }
+      };
+      
+      reader.onerror = () => {
+        toast.error('Error reading file');
+      };
+      
       reader.readAsDataURL(file);
     }
   };
@@ -81,6 +127,9 @@ const InvoiceSettings = () => {
           
           const uploadResponse = await fetch('http://localhost:3001/api/settings/upload-logo', {
             method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
             body: formData,
           });
           
@@ -88,7 +137,16 @@ const InvoiceSettings = () => {
             const uploadData = await uploadResponse.json();
             logoUrl = uploadData.logoUrl;
             setSettings(prev => ({ ...prev, logoUrl }));
+            // Update header logo with the uploaded URL
+            updateLogo(logoUrl);
+          } else {
+            const errorText = await uploadResponse.text();
+            toast.error(`Logo upload failed: ${uploadResponse.status} - ${errorText}`);
+            setLoading(false);
+            return; // Stop here if logo upload fails
           }
+        } else {
+          // No file selected for upload, using existing logo
         }
       }
 
@@ -97,7 +155,7 @@ const InvoiceSettings = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify({
           ...settings,
@@ -106,16 +164,19 @@ const InvoiceSettings = () => {
       });
 
       if (saveResponse.ok) {
+        const saveData = await saveResponse.json();
         toast.success('Settings saved successfully!');
         // Update local state with the new logo URL
         if (logoUrl !== settings.logoUrl) {
           setLogoPreview(logoUrl);
+          // Call the callback to update header logo in real-time
+          updateLogo(logoUrl);
         }
       } else {
-        toast.error('Failed to save settings');
+        const errorText = await saveResponse.text();
+        toast.error(`Failed to save settings: ${saveResponse.status} - ${errorText}`);
       }
     } catch (error) {
-      console.error('Error saving settings:', error);
       toast.error('Failed to save settings');
     } finally {
       setLoading(false);
@@ -135,7 +196,10 @@ const InvoiceSettings = () => {
       logoUrl: '',
       primaryColor: '#8B5CF6',
       secondaryColor: '#EC4899',
-      accentColor: '#3B82F6'
+      accentColor: '#3B82F6',
+      fiscalNumber: '',
+      taxRegistrationNumber: '',
+      siretNumber: ''
     });
     setLogoPreview('');
   };
@@ -159,16 +223,16 @@ const InvoiceSettings = () => {
             <div className="flex items-center gap-4">
               {/* Logo Display */}
               {logoPreview ? (
-                <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white/20 bg-white/10">
+                <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-white/20 bg-white/10">
                   <img src={logoPreview} alt="Company Logo" className="w-full h-full object-contain" />
                 </div>
               ) : settings.logoUrl ? (
-                <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white/20 bg-white/10">
+                <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-white/20 bg-white/10">
                   <img src={settings.logoUrl} alt="Company Logo" className="w-full h-full object-contain" />
                 </div>
               ) : (
                 <div 
-                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-xl border-2 border-white/20 bg-white/10"
+                  className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-bold text-xl border-2 border-white/20 bg-white/10"
                   style={{ backgroundColor: settings.primaryColor }}
                 >
                   {settings.companyName.charAt(0) || 'C'}
@@ -299,8 +363,46 @@ const InvoiceSettings = () => {
                         type="text"
                         value={settings.paymentText}
                         onChange={(e) => updateField('paymentText', e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 transition-colors"
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors"
                         placeholder="Payment instructions"
+                      />
+                    </div>
+
+                    {/* Fiscal Information Section */}
+                    <div className="md:col-span-2">
+                      <h4 className="text-lg font-semibold text-slate-800 mb-4 border-b border-slate-200 pb-2">Fiscal Information</h4>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Fiscal Number</label>
+                      <input
+                        type="text"
+                        value={settings.fiscalNumber}
+                        onChange={(e) => updateField('fiscalNumber', e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors"
+                        placeholder="Fiscal Number"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Tax Registration Number</label>
+                      <input
+                        type="text"
+                        value={settings.taxRegistrationNumber}
+                        onChange={(e) => updateField('taxRegistrationNumber', e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors"
+                        placeholder="Tax Registration Number"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">SIRET Number</label>
+                      <input
+                        type="text"
+                        value={settings.siretNumber}
+                        onChange={(e) => updateField('siretNumber', e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors"
+                        placeholder="SIRET Number"
                       />
                     </div>
                   </div>
@@ -313,6 +415,7 @@ const InvoiceSettings = () => {
                   
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-3">Company Logo</label>
+                    
                     <div className="relative">
                       <input
                         type="file"
@@ -326,18 +429,28 @@ const InvoiceSettings = () => {
                         className="flex items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-purple-400 hover:bg-slate-50 transition-all group"
                       >
                         {logoPreview ? (
-                          <div className="relative w-full h-full">
-                            <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain rounded-xl" />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-xl transition-all flex items-center justify-center">
-                              <Upload className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
-                            </div>
+                          <div className="w-full h-32 bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center">
+                            <img 
+                              src={logoPreview} 
+                              alt="Logo preview" 
+                              className="w-24 h-24 object-contain" 
+                              onError={(e) => {
+                                console.error('Image failed to load:', logoPreview);
+                                toast.error('Failed to load image preview');
+                              }}
+                            />
                           </div>
                         ) : settings.logoUrl ? (
-                          <div className="relative w-full h-full">
-                            <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain rounded-xl" />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-xl transition-all flex items-center justify-center">
-                              <Upload className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
-                            </div>
+                          <div className="w-full h-32 bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center">
+                            <img 
+                              src={settings.logoUrl} 
+                              alt="Logo preview" 
+                              className="w-24 h-24 object-contain" 
+                              onError={(e) => {
+                                console.error('Image failed to load:', settings.logoUrl);
+                                toast.error('Failed to load saved logo');
+                              }}
+                            />
                           </div>
                         ) : (
                           <div className="text-center">
@@ -396,16 +509,16 @@ const InvoiceSettings = () => {
                     <div className="flex items-start justify-between mb-8">
                       <div className="flex items-center gap-4">
                         {logoPreview ? (
-                          <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-slate-200">
+                          <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200">
                             <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
                           </div>
                         ) : settings.logoUrl ? (
-                          <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-slate-200">
+                          <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200">
                             <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
                           </div>
                         ) : (
                           <div 
-                            className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-bold text-xl border-2"
+                            className="w-20 h-20 rounded-xl flex items-center justify-center text-white font-bold text-xl border-2"
                             style={{ 
                               backgroundColor: settings.primaryColor,
                               borderColor: settings.primaryColor
@@ -441,9 +554,18 @@ const InvoiceSettings = () => {
                         <h3 className="font-semibold text-slate-800 mb-3">From:</h3>
                         <div className="space-y-1 text-slate-600">
                           <p>{settings.companyEmail || 'contact@company.com'}</p>
-                          <p>{settings.companyWebsite || 'company.com'}</p>
-                          <p>{settings.companyAddress || 'Company Address'}</p>
-                          <p>{settings.companyCity || 'City'}, {settings.companyCountry || 'Country'}</p>
+                          <p>{settings.companyWebsite || 'e-shop.com'}</p>
+                          <p>{settings.companyAddress || '123 Business Street'}</p>
+                          <p>{settings.companyCity || 'Tunis'}, {settings.companyCountry || 'Tunisia'}</p>
+                          {settings.fiscalNumber && (
+                            <p className="text-sm text-slate-500">Fiscal: {settings.fiscalNumber}</p>
+                          )}
+                          {settings.taxRegistrationNumber && (
+                            <p className="text-sm text-slate-500">Tax Reg: {settings.taxRegistrationNumber}</p>
+                          )}
+                          {settings.siretNumber && (
+                            <p className="text-sm text-slate-500">SIRET: {settings.siretNumber}</p>
+                          )}
                         </div>
                       </div>
                       
@@ -543,22 +665,22 @@ const InvoiceSettings = () => {
               
               <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 border-2 border-slate-200">
                 <div className="flex items-center gap-3 mb-4">
-                  {logoPreview ? (
-                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-300">
-                      <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
-                    </div>
-                  ) : settings.logoUrl ? (
-                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-300">
-                      <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
-                    </div>
-                  ) : (
-                    <div 
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                      style={{ backgroundColor: settings.primaryColor }}
-                    >
-                      {settings.companyName.charAt(0) || 'C'}
-                    </div>
-                  )}
+                   {logoPreview ? (
+                     <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-300">
+                       <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
+                     </div>
+                   ) : settings.logoUrl ? (
+                     <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-300">
+                       <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                     </div>
+                   ) : (
+                     <div 
+                       className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                       style={{ backgroundColor: settings.primaryColor }}
+                     >
+                       {settings.companyName.charAt(0) || 'C'}
+                     </div>
+                   )}
                   <div>
                     <h3 
                       className="font-bold text-sm"
@@ -576,6 +698,15 @@ const InvoiceSettings = () => {
                   <div>
                     {settings.companyAddress || 'Address'}, {settings.companyCity || 'City'}, {settings.companyCountry || 'Country'}
                   </div>
+                  {settings.fiscalNumber && (
+                    <div className="text-xs text-slate-500">Fiscal: {settings.fiscalNumber}</div>
+                  )}
+                  {settings.taxRegistrationNumber && (
+                    <div className="text-xs text-slate-500">Tax Reg: {settings.taxRegistrationNumber}</div>
+                  )}
+                  {settings.siretNumber && (
+                    <div className="text-xs text-slate-500">SIRET: {settings.siretNumber}</div>
+                  )}
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-300">

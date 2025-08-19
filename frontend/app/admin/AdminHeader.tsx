@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
 import { useLanguage } from '../../lib/languageContext';
@@ -11,11 +11,22 @@ interface AdminHeaderProps {
   setNotifications: (fn: (prev: any[]) => any[]) => void;
 }
 
-const AdminHeader: React.FC<AdminHeaderProps> = ({ notifications, showNotifications, setShowNotifications, handleView, setNotifications }) => {
+const AdminHeader: React.FC<AdminHeaderProps> = ({ 
+  notifications, 
+  showNotifications, 
+  setShowNotifications, 
+  handleView, 
+  setNotifications,
+}) => {
   const { t } = useLanguage();
+  
+ 
   
   return (
     <div className="fixed top-6 right-8 z-50">
+      {/* Logo Display */}
+      
+      
       <button
         className="relative focus:outline-none"
         onClick={() => setShowNotifications((prev) => !prev)}

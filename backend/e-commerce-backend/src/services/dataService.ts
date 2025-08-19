@@ -834,6 +834,54 @@ export class DatabaseService {
     }
   }
 
+  async setBaseCurrency(id: string): Promise<any> {
+    try {
+      // First, check if the currency exists and is active
+      const currencyResult = await pool.query(
+        'SELECT id, is_active FROM currencies WHERE id = $1',
+        [id]
+      );
+      
+      if (currencyResult.rows.length === 0) {
+        throw new Error('Currency not found');
+      }
+      
+      if (!currencyResult.rows[0].is_active) {
+        throw new Error('Cannot set inactive currency as base currency');
+      }
+      
+      // Start a transaction
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        
+        // Set all currencies as non-base first
+        await client.query('UPDATE currencies SET is_base = false, updated_at = $1', [new Date()]);
+        
+        // Set the specified currency as base
+        const result = await client.query(
+          'UPDATE currencies SET is_base = true, updated_at = $1 WHERE id = $2 RETURNING *',
+          [new Date(), id]
+        );
+        
+        if (result.rows.length === 0) {
+          throw new Error('Failed to update currency');
+        }
+        
+        await client.query('COMMIT');
+        return this.mapCurrencyRow(result.rows[0]);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error('Error setting base currency:', error);
+      throw new Error('Failed to set base currency');
+    }
+  }
+
   private mapCurrencyRow(row: any): any {
     return {
       id: row.id,
@@ -1386,6 +1434,9 @@ export class DatabaseService {
             primary_color VARCHAR(7) DEFAULT '#8B5CF6',
             secondary_color VARCHAR(7) DEFAULT '#EC4899',
             accent_color VARCHAR(7) DEFAULT '#3B82F6',
+            fiscal_number VARCHAR(255) DEFAULT '',
+            tax_registration_number VARCHAR(255) DEFAULT '',
+            siret_number VARCHAR(255) DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
@@ -1424,7 +1475,10 @@ export class DatabaseService {
         logoUrl: '',
         primaryColor: '#8B5CF6',
         secondaryColor: '#EC4899',
-        accentColor: '#3B82F6'
+        accentColor: '#3B82F6',
+        fiscalNumber: '',
+        taxRegistrationNumber: '',
+        siretNumber: ''
       };
     }
   }
@@ -1457,8 +1511,11 @@ export class DatabaseService {
             primary_color = $10,
             secondary_color = $11,
             accent_color = $12,
-            updated_at = $13
-          WHERE id = $14
+            fiscal_number = $13,
+            tax_registration_number = $14,
+            siret_number = $15,
+            updated_at = $16
+          WHERE id = $17
           RETURNING *
         `, [
           settings.companyName || 'E-Shop',
@@ -1473,6 +1530,9 @@ export class DatabaseService {
           settings.primaryColor || '#8B5CF6',
           settings.secondaryColor || '#EC4899',
           settings.accentColor || '#3B82F6',
+          settings.fiscalNumber || '',
+          settings.taxRegistrationNumber || '',
+          settings.siretNumber || '',
           now,
           checkResult.rows[0].id
         ]);
@@ -1483,8 +1543,9 @@ export class DatabaseService {
             company_name, company_tagline, company_email, company_website,
             company_address, company_city, company_country, payment_text,
             logo_url, primary_color, secondary_color, accent_color,
+            fiscal_number, tax_registration_number, siret_number,
             created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
           RETURNING *
         `, [
           settings.companyName || 'E-Shop',
@@ -1499,6 +1560,9 @@ export class DatabaseService {
           settings.primaryColor || '#8B5CF6',
           settings.secondaryColor || '#EC4899',
           settings.accentColor || '#3B82F6',
+          settings.fiscalNumber || '',
+          settings.taxRegistrationNumber || '',
+          settings.siretNumber || '',
           now,
           now
         ]);
@@ -1524,7 +1588,10 @@ export class DatabaseService {
       logoUrl: row.logo_url,
       primaryColor: row.primary_color,
       secondaryColor: row.secondary_color,
-      accentColor: row.accent_color
+      accentColor: row.accent_color,
+      fiscalNumber: row.fiscal_number,
+      taxRegistrationNumber: row.tax_registration_number,
+      siretNumber: row.siret_number
     };
   }
 }

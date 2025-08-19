@@ -21,6 +21,7 @@ import AdminHeader from './AdminHeader';
 import NotificationDropdown from './NotificationDropdown';
 import StatsCards from './StatsCards';
 import TabBar from './TabBar';
+import { useLogo } from '../contexts/LogoContext';
 
 
 
@@ -48,6 +49,7 @@ const AdminDashboard: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [togglingCurrencyId, setTogglingCurrencyId] = useState<string | null>(null);
+  const { currentLogo, updateLogo } = useLogo();
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -706,32 +708,21 @@ const AdminDashboard: React.FC = () => {
 
       const updatedCurrency = await response.json();
       
-      // Handle deactivation immediately (no refresh needed)
-      if (!updatedCurrency.isActive) {
-        setCurrencies(prevCurrencies => 
-          prevCurrencies.map(c => 
-            c.id === currency.id ? { ...c, isActive: false } : c
-          )
-        );
-      } else {
-        // For activation, force a page refresh to show updated state
-        toast.success('Currency activated! Refreshing page to show changes...');
-        
-        // Force page refresh after a short delay
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      }
-
+      // Update the currency in the local state immediately (no refresh needed)
+      setCurrencies(prevCurrencies => 
+        prevCurrencies.map(c => 
+          c.id === currency.id ? { ...c, isActive: updatedCurrency.isActive } : c
+        )
+      );
+      
       // Refresh base currency context if needed
       if (updatedCurrency.isBase) {
         refreshBaseCurrency();
       }
       
-      // Only show success message for deactivation (activation shows its own message)
-      if (!updatedCurrency.isActive) {
-        toast.success(updatedCurrency.message || 'Currency deactivated successfully');
-      }
+      // Show success message
+      const action = updatedCurrency.isActive ? 'activated' : 'deactivated';
+      toast.success(`Currency ${action} successfully`);
       
     } catch (err) {
       console.error('Toggle currency status error:', err);
@@ -1874,6 +1865,11 @@ const AdminDashboard: React.FC = () => {
   // Calculate total chiffre d'affaires (potential revenue from stock)
   const totalRevenue = products.reduce((sum, product) => sum + ((product.stock || 0) * (product.price || 0)), 0);
 
+  // Function to update header logo
+  const handleLogoUpdate = (logoUrl: string) => {
+    updateLogo(logoUrl);
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -1886,6 +1882,7 @@ const AdminDashboard: React.FC = () => {
       />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 rounded-3xl shadow-xl border border-gray-100">
         <StatsCards users={users} products={products} orders={orders} totalRevenue={totalRevenue} />
+        
         <TabBar 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 

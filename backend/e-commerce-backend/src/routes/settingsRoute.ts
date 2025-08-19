@@ -46,6 +46,62 @@ router.get('/currencies', async (req: Request, res: Response) => {
   }
 });
 
+// Toggle currency status
+router.post('/currencies/:id/toggle', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const currency = await dataService.toggleCurrencyStatus(id);
+    return res.json({ message: 'Currency status updated', currency });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to toggle currency status' });
+  }
+});
+
+// Add new currency
+router.post('/currencies', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { name, code, symbol, isActive, exchangeRate, isBase } = req.body;
+    const currency = await dataService.addCurrency({ name, code, symbol, isActive, exchangeRate, isBase });
+    return res.status(201).json({ message: 'Currency added successfully', currency });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to add currency' });
+  }
+});
+
+// Update currency
+router.put('/currencies/:id', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    const currency = await dataService.updateCurrency(id, updateData);
+    return res.json({ message: 'Currency updated successfully', currency });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to update currency' });
+  }
+});
+
+// Delete currency
+router.delete('/currencies/:id', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await dataService.deleteCurrency(id);
+    return res.json({ message: 'Currency deleted successfully' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to delete currency' });
+  }
+});
+
+// Set currency as base currency
+router.post('/currencies/:id/set-base', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const currency = await dataService.setBaseCurrency(id);
+    return res.json({ message: 'Base currency updated successfully', currency });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to set base currency' });
+  }
+});
+
 // Get base currency
 router.get('/base-currency', async (req: Request, res: Response) => {
   try {
@@ -140,6 +196,50 @@ router.get('/logo/:filename', (req: Request, res: Response) => {
     res.sendFile(logoPath);
   } else {
     res.status(404).json({ error: 'Logo not found' });
+  }
+});
+
+// Get tax setting
+router.get('/tax', async (req: Request, res: Response) => {
+  try {
+    const tax = await dataService.getTax();
+    return res.json({ tax });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to get tax' });
+  }
+});
+
+// Set tax setting
+router.post('/tax', requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { tax } = req.body;
+    if (tax === undefined || isNaN(Number(tax))) {
+      return res.status(400).json({ error: 'Invalid tax value' });
+    }
+    await dataService.setTax(String(tax));
+    return res.json({ message: 'Tax updated', tax });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to set tax' });
+  }
+});
+
+// Get all taxes
+router.get('/taxes', async (req: Request, res: Response) => {
+  try {
+    const taxes = await dataService.getTaxes();
+    return res.json({ taxes });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to get taxes' });
+  }
+});
+
+// Get active taxes
+router.get('/active-taxes', async (req: Request, res: Response) => {
+  try {
+    const taxes = await dataService.getActiveTaxes();
+    return res.json({ taxes });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to get active taxes' });
   }
 });
 

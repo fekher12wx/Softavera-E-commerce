@@ -47,7 +47,7 @@ export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children }) 
       setError(null);
       
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:3001/api/settings/currencies/base', {
+      const response = await fetch('http://localhost:3001/api/settings/base-currency', {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
         },
