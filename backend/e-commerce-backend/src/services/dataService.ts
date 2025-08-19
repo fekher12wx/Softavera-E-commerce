@@ -323,7 +323,7 @@ export class DatabaseService {
     }
   }
 
-  async deleteUser(id: string): Promise<{ success: boolean; dependencies?: { orders?: any[]; reviews?: any[] }; userExists?: boolean }> {
+  async deleteUser(id: string, forceDelete: boolean = false): Promise<{ success: boolean; dependencies?: { orders?: any[]; reviews?: any[] }; userExists?: boolean }> {
     try {
       
       // First check if user exists
@@ -336,7 +336,7 @@ export class DatabaseService {
       const ordersResult = await pool.query('SELECT id FROM orders WHERE user_id = $1', [id]);
       const reviewsResult = await pool.query('SELECT id FROM reviews WHERE user_id = $1', [id]);
       
-      if (ordersResult.rows.length > 0 || reviewsResult.rows.length > 0) {
+      if (!forceDelete && (ordersResult.rows.length > 0 || reviewsResult.rows.length > 0)) {
         return {
           success: false,
           dependencies: {
@@ -347,7 +347,19 @@ export class DatabaseService {
         };
       }
       
-      // If no dependencies, proceed with deletion
+      // If force delete is enabled or no dependencies, proceed with deletion
+      if (forceDelete) {
+        // For force delete, first delete dependencies
+        if (ordersResult.rows.length > 0) {
+          await pool.query('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = $1)', [id]);
+          await pool.query('DELETE FROM orders WHERE user_id = $1', [id]);
+        }
+        if (reviewsResult.rows.length > 0) {
+          await pool.query('DELETE FROM reviews WHERE user_id = $1', [id]);
+        }
+      }
+      
+      // Delete the user
       const result = await pool.query('DELETE FROM users WHERE id = $1', [id]);
       return { success: (result.rowCount ?? 0) > 0, userExists: true };
     } catch (error) {
@@ -801,33 +813,71 @@ export class DatabaseService {
 
   async toggleCurrencyStatus(id: string): Promise<any> {
     try {
-      // First, get the current status of the currency
-      const currentResult = await pool.query(
-        'SELECT is_active FROM currencies WHERE id = $1',
-        [id]
-      );
-      
-      if (currentResult.rows.length === 0) {
-        throw new Error('Currency not found');
+      // Start a transaction
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        
+        // First, get the current status and base status of the currency
+        const currentResult = await client.query(
+          'SELECT is_active, is_base FROM currencies WHERE id = $1',
+          [id]
+        );
+        
+        if (currentResult.rows.length === 0) {
+          throw new Error('Currency not found');
+        }
+        
+        const currentStatus = currentResult.rows[0].is_active;
+        const isBase = currentResult.rows[0].is_base;
+        const newStatus = !currentStatus;
+        
+        // If we're deactivating a base currency, we need to handle it carefully
+        if (isBase && !newStatus) {
+          const activeCurrenciesResult = await client.query(
+            'SELECT COUNT(*) FROM currencies WHERE is_active = true AND id != $1',
+            [id]
+          );
+          
+          const activeCount = parseInt(activeCurrenciesResult.rows[0].count);
+          
+          if (activeCount === 0) {
+            // If this is the only active currency, we can't deactivate it
+            throw new Error('Cannot deactivate the only active currency. Please activate another currency first or set a different currency as base.');
+          }
+          
+          // Automatically set the first active currency as the new base currency
+          const newBaseCurrencyResult = await client.query(
+            'SELECT id FROM currencies WHERE is_active = true AND id != $1 ORDER BY created_at ASC LIMIT 1',
+            [id]
+          );
+          
+          if (newBaseCurrencyResult.rows.length > 0) {
+            await client.query(
+              'UPDATE currencies SET is_base = true, updated_at = $1 WHERE id = $2',
+              [new Date(), newBaseCurrencyResult.rows[0].id]
+            );
+          }
+        }
+        
+        // Update the specific currency
+        const result = await client.query(
+          'UPDATE currencies SET is_active = $1, updated_at = $2 WHERE id = $3 RETURNING *',
+          [newStatus, new Date(), id]
+        );
+        
+        if (result.rows.length === 0) {
+          throw new Error('Currency not found');
+        }
+        
+        await client.query('COMMIT');
+        return this.mapCurrencyRow(result.rows[0]);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
-      
-      const currentStatus = currentResult.rows[0].is_active;
-      const newStatus = !currentStatus;
-      
-      // Note: Multiple currencies can be active at the same time
-      // No need to deactivate others when activating a currency
-      
-      // Now update the specific currency
-      const result = await pool.query(
-        'UPDATE currencies SET is_active = $1, updated_at = $2 WHERE id = $3 RETURNING *',
-        [newStatus, new Date(), id]
-      );
-      
-      if (result.rows.length === 0) {
-        throw new Error('Currency not found');
-      }
-      
-      return this.mapCurrencyRow(result.rows[0]);
     } catch (error) {
       console.error('Error toggling currency status:', error);
       throw new Error('Failed to toggle currency status');

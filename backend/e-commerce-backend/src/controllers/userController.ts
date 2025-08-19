@@ -162,6 +162,13 @@ export class UserController {
   async checkUserDeletion(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      const isAdmin = req.user?.role === UserRole.ADMIN;
+      
+      // For admin users, always allow deletion (with force delete)
+      if (isAdmin) {
+        res.json({ canDelete: true, adminOverride: true });
+        return;
+      }
       
       const result = await dataService.deleteUser(id);
       
@@ -202,9 +209,10 @@ export class UserController {
   async deleteUser(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      const isAdmin = req.user?.role === UserRole.ADMIN;
 
-
-      const result = await dataService.deleteUser(id);
+      // Use force delete for admin users
+      const result = await dataService.deleteUser(id, isAdmin);
 
       if (!result.success) {
         if (!result.userExists) {
@@ -212,7 +220,7 @@ export class UserController {
           return;
         }
         
-        if (result.dependencies) {
+        if (result.dependencies && !isAdmin) {
           const { orders, reviews } = result.dependencies;
           let message = 'Cannot delete user. ';
           const reasons = [];
@@ -238,7 +246,8 @@ export class UserController {
         return;
       }
 
-      res.json({ message: 'User deleted successfully' });
+      const message = isAdmin ? 'User deleted successfully (admin override)' : 'User deleted successfully';
+      res.json({ message });
     } catch (error) {
       console.error('Error deleting user:', error);
       res.status(500).json({ error: 'Failed to delete user' });

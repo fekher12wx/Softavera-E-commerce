@@ -9,19 +9,21 @@ interface UsersTableProps {
   handleView: (user: User) => void;
   handleEdit: (user: User) => void;
   handleDelete: (id: string) => void;
-  canDeleteUser?: (userId: string) => Promise<{ canDelete: boolean; reason?: string }>;
+  canDeleteUser?: (userId: string) => Promise<{ canDelete: boolean; reason?: string; adminOverride?: boolean }>;
 }
 
 const UsersTable: React.FC<UsersTableProps> = ({ users, searchTerm, handleView, handleEdit, handleDelete, canDeleteUser }) => {
   const { t } = useLanguage();
-  const [userDeleteStatus, setUserDeleteStatus] = React.useState<Record<string, { canDelete: boolean; reason?: string }>>({});
+  const [userDeleteStatus, setUserDeleteStatus] = React.useState<Record<string, { canDelete: boolean; reason?: string; adminOverride?: boolean }>>({});
   
   // Check delete status for all users when component mounts or users change
   React.useEffect(() => {
-    if (!canDeleteUser) return;
+    if (!canDeleteUser) {
+      return;
+    }
     
     const checkAllUsers = async () => {
-      const statusMap: Record<string, { canDelete: boolean; reason?: string }> = {};
+      const statusMap: Record<string, { canDelete: boolean; reason?: string; adminOverride?: boolean }> = {};
       
       for (const user of users) {
         try {
@@ -100,7 +102,7 @@ const UsersTable: React.FC<UsersTableProps> = ({ users, searchTerm, handleView, 
                         <div className="flex flex-col">
                           <div className="flex items-center space-x-2">
                             <p className="font-semibold text-gray-900 truncate">{user?.name || t('unknown_user')}</p>
-                            {user?.role === 'ADMIN' && (
+                                                         {user?.role === 'ADMIN' && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 border border-amber-200">
                                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
@@ -181,15 +183,28 @@ const UsersTable: React.FC<UsersTableProps> = ({ users, searchTerm, handleView, 
                           const deleteStatus = userDeleteStatus[user.id];
                           const canDelete = deleteStatus?.canDelete ?? true;
                           const reason = deleteStatus?.reason;
+                          const adminOverride = deleteStatus?.adminOverride;
                           
                           if (canDelete) {
+                            const title = adminOverride 
+                              ? 'Delete user (admin override - will remove all associated data)' 
+                              : t('delete_user');
+                            
                             return (
                               <button
                                 onClick={() => handleDelete?.(user.id)}
-                                className="group/btn p-2 hover:bg-rose-50 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95"
-                                title={t('delete_user')}
+                                className={`group/btn p-2 rounded-lg transition-all duration-200 hover:scale-110 active:scale-95 ${
+                                  adminOverride 
+                                    ? 'hover:bg-orange-50 bg-orange-50/50' 
+                                    : 'hover:bg-rose-50'
+                                }`}
+                                title={title}
                               >
-                                <Trash2 className="w-4 h-4 text-rose-600 group-hover/btn:text-rose-700" />
+                                <Trash2 className={`w-4 h-4 ${
+                                  adminOverride 
+                                    ? 'text-orange-600 group-hover/btn:text-orange-700' 
+                                    : 'text-rose-600 group-hover/btn:text-rose-700'
+                                }`} />
                               </button>
                             );
                           } else {

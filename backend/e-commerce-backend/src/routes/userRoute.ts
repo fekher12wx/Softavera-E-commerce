@@ -20,9 +20,9 @@ router.post('/', userController.createUser);
 router.patch('/:id', userController.updateUser);
 
 // GET /api/users/:id/check-delete
-router.get('/:id/check-delete', userController.checkUserDeletion);
+router.get('/:id/check-delete', authenticateToken, userController.checkUserDeletion);
 
 // DELETE /api/users/:id
-router.delete('/:id', userController.deleteUser);
+router.delete('/:id', authenticateToken, userController.deleteUser);
 
 export default router;

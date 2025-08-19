@@ -135,19 +135,21 @@ const TabBar = ({
         })}
       </div>
       
-      {/* Compact Add Button */}
-      <button
-        onClick={onAddNew}
-        className="group relative overflow-hidden px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-        <div className="relative flex items-center gap-2">
-          <div className="p-1 bg-white/20 rounded-md group-hover:rotate-90 transition-transform duration-200">
-            <Plus className="h-3.5 w-3.5" />
+      {/* Compact Add Button - Hidden for Invoice Settings */}
+      {activeTab !== 'invoiceSettings' && (
+        <button
+          onClick={onAddNew}
+          className="group relative overflow-hidden px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+          <div className="relative flex items-center gap-2">
+            <div className="p-1 bg-white/20 rounded-md group-hover:rotate-90 transition-transform duration-200">
+              <Plus className="h-3.5 w-3.5" />
+            </div>
+            <span className="text-sm font-semibold">Add New</span>
           </div>
-          <span className="text-sm font-semibold">Add New</span>
-        </div>
-      </button>
+        </button>
+      )}
     </div>
   );
 };

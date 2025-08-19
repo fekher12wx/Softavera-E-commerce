@@ -18,6 +18,7 @@ interface CurrencyContextType {
   baseCurrency: BaseCurrency | null;
   setBaseCurrency: (currency: BaseCurrency | null) => void;
   refreshBaseCurrency: () => Promise<void>;
+  updateBaseCurrency: (currency: BaseCurrency) => void;
   loading: boolean;
   error: string | null;
   convertPrice: (price: number, fromCurrency?: BaseCurrency) => number;
@@ -80,6 +81,11 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
     await fetchBaseCurrency();
   };
 
+  const updateBaseCurrency = (currency: BaseCurrency) => {
+    setBaseCurrency(currency);
+    setError(null);
+  };
+
   useEffect(() => {
     fetchBaseCurrency();
   }, []);
@@ -102,6 +108,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
       baseCurrency,
       setBaseCurrency,
       refreshBaseCurrency,
+      updateBaseCurrency,
       loading,
       error,
       convertPrice,

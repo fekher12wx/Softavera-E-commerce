@@ -27,7 +27,7 @@ import { useLogo } from '../contexts/LogoContext';
 
 const AdminDashboard: React.FC = () => {
   // All hooks at the top!
-  const { getCurrencySymbol, refreshBaseCurrency } = useCurrency();
+  const { getCurrencySymbol, refreshBaseCurrency, updateBaseCurrency } = useCurrency();
   const { t } = useLanguage();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('users');
@@ -49,6 +49,8 @@ const AdminDashboard: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [togglingCurrencyId, setTogglingCurrencyId] = useState<string | null>(null);
+  const [isUpdatingCurrencies, setIsUpdatingCurrencies] = useState(false);
+  const [currencyUpdateSuccess, setCurrencyUpdateSuccess] = useState(false);
   const { currentLogo, updateLogo } = useLogo();
 
   useEffect(() => {
@@ -303,6 +305,16 @@ const AdminDashboard: React.FC = () => {
     }
   }, [paymentMethods.length, loading]);
 
+  // Reset currency update success state after 3 seconds
+  useEffect(() => {
+    if (currencyUpdateSuccess) {
+      const timer = setTimeout(() => {
+        setCurrencyUpdateSuccess(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [currencyUpdateSuccess]);
+
   // Only after all hooks, do your conditional returns:
   if (isAuthorized === false) {
     return (
@@ -359,7 +371,23 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return;
+    // Check if this is an admin override deletion for users
+    if (activeTab === 'users') {
+      const deleteStatus = await canDeleteUser(id);
+      const isAdminOverride = deleteStatus.adminOverride;
+      
+      let confirmMessage = 'Are you sure you want to delete this user?';
+      if (isAdminOverride) {
+        confirmMessage = '⚠️ ADMIN OVERRIDE: This user has associated orders/reviews that will be permanently deleted along with the user. Are you sure you want to proceed?';
+      }
+      
+      if (!window.confirm(confirmMessage)) return;
+      
+      // Store the admin override status for use in the actual deletion
+      (window as any).__adminOverrideDelete = isAdminOverride;
+    } else {
+      if (!window.confirm('Are you sure you want to delete this item?')) return;
+    }
     
   
     
@@ -498,11 +526,18 @@ const AdminDashboard: React.FC = () => {
         }
       }
 
-      const responseData = await response.text();
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch {
+        responseData = await response.text();
+      }
 
       if (activeTab === 'users') {
         setUsers(users.filter(user => user.id !== id));
-        toast.success('User deleted successfully!');
+        // Check if this was an admin override deletion
+        const message = responseData.message || 'User deleted successfully!';
+        toast.success(message);
       } else if (activeTab === 'products') {
         setProducts(products.filter(product => product.id !== id));
         toast.success('Product deleted successfully!');
@@ -546,7 +581,7 @@ const AdminDashboard: React.FC = () => {
     return users;
   };
 
-  const canDeleteUser = async (userId: string): Promise<{ canDelete: boolean; reason?: string }> => {
+  const canDeleteUser = async (userId: string): Promise<{ canDelete: boolean; reason?: string; adminOverride?: boolean }> => {
     // Only check user deletion when we're actually on the users tab
     if (activeTab !== 'users') {
       return { canDelete: true };
@@ -562,15 +597,22 @@ const AdminDashboard: React.FC = () => {
         },
       });
       
-      
       if (response.ok) {
         const data = await response.json();
-        return { canDelete: data.canDelete, reason: data.reason };
+        return { canDelete: data.canDelete, reason: data.reason, adminOverride: data.adminOverride };
       }
       
       if (response.status === 404) {
         console.warn('User not found when checking deletion:', userId);
         return { canDelete: false, reason: 'User not found' };
+      }
+      
+      // Log the error response
+      try {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+      } catch (e) {
+        console.error('Could not read error response');
       }
       
       console.warn('Check delete failed, defaulting to allow deletion');
@@ -687,17 +729,41 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleToggleCurrencyStatus = async (currency: any) => {
+    // Show confirmation dialog for important operations
+    if (currency.isBase && currency.isActive) {
+      const otherActiveCurrencies = currencies.filter(c => c.isActive && c.id !== currency.id);
+      
+      if (otherActiveCurrencies.length === 0) {
+        toast.error('Cannot deactivate the only active currency. Please activate another currency first.');
+        return;
+      }
+      
+      const message = `Are you sure you want to deactivate the base currency "${currency.name}"?\n\nThis will automatically select "${otherActiveCurrencies[0].name}" as the new base currency.\n\nAll prices throughout the website will be recalculated using the new base currency.`;
+      
+      const confirmed = window.confirm(message);
+      if (!confirmed) return;
+    } else if (!currency.isActive) {
+      const confirmed = window.confirm(
+        `Are you sure you want to activate the currency "${currency.name}"?\n\nThis currency will be available for use throughout the website.`
+      );
+      if (!confirmed) return;
+    } else {
+      const confirmed = window.confirm(
+        `Are you sure you want to deactivate the currency "${currency.name}"?\n\nThis currency will no longer be available for use throughout the website.`
+      );
+      if (!confirmed) return;
+    }
+
     try {
       setTogglingCurrencyId(currency.id);
+      setIsUpdatingCurrencies(true);
       const token = localStorage.getItem('authToken');
-      
-      console.log(`Toggling currency ${currency.name} status`);
       
       const response = await fetch(`http://localhost:3001/api/settings/currencies/${currency.id}/toggle`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'  ,
+          'Content-Type': 'application/json',
         },
       });
 
@@ -715,20 +781,46 @@ const AdminDashboard: React.FC = () => {
         )
       );
       
-      // Refresh base currency context if needed
-      if (updatedCurrency.isBase) {
-        refreshBaseCurrency();
+      // If this currency is now active and was set as base, update the base currency context immediately
+      if (updatedCurrency.isActive && updatedCurrency.isBase) {
+        updateBaseCurrency(updatedCurrency);
+        toast.success(`Currency ${currency.name} activated and set as base currency!`);
+        setCurrencyUpdateSuccess(true);
+      } else if (updatedCurrency.isActive) {
+        toast.success(`Currency ${currency.name} activated successfully!`);
+        setCurrencyUpdateSuccess(true);
+      } else {
+        // If deactivating a base currency, we need to handle this case
+        if (currency.isBase) {
+          toast.error(`Base currency ${currency.name} has been deactivated. A new base currency has been automatically selected.`);
+          // Refresh base currency context to get the new base currency
+          await refreshBaseCurrency();
+          setCurrencyUpdateSuccess(true);
+        } else {
+          toast.success(`Currency ${currency.name} deactivated successfully!`);
+          setCurrencyUpdateSuccess(true);
+        }
       }
-      
-      // Show success message
-      const action = updatedCurrency.isActive ? 'activated' : 'deactivated';
-      toast.success(`Currency ${action} successfully`);
       
     } catch (err) {
       console.error('Toggle currency status error:', err);
-      toast.error(`Failed to toggle currency status: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Provide more user-friendly error messages
+      let errorMessage = 'Failed to toggle currency status';
+      if (err instanceof Error) {
+        if (err.message.includes('only active currency')) {
+          errorMessage = 'Cannot deactivate the only active currency. Please activate another currency first.';
+        } else if (err.message.includes('Cannot deactivate')) {
+          errorMessage = err.message;
+        } else {
+          errorMessage = `Failed to toggle currency status: ${err.message}`;
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setTogglingCurrencyId(null);
+      setIsUpdatingCurrencies(false);
     }
   };
 
@@ -1004,7 +1096,7 @@ const AdminDashboard: React.FC = () => {
         console.log('Currency code:', (updatedItem as any).currency?.code);
         console.log('Full updatedItem:', JSON.stringify(updatedItem, null, 2));
 
-        // Handle base currency exclusivity - only one can be base
+                // Handle base currency exclusivity - only one can be base
         if ((updatedItem as any).currency?.isBase) {
           // If this currency is being set as base, remove base from all others
           setCurrencies(prevCurrencies => 
@@ -1013,6 +1105,9 @@ const AdminDashboard: React.FC = () => {
               isBase: false
             }))
           );
+          
+          // Update the base currency context immediately
+          updateBaseCurrency((updatedItem as any).currency);
         }
 
         // Handle active currency exclusivity - only one can be active
@@ -1028,15 +1123,10 @@ const AdminDashboard: React.FC = () => {
 
         // Update the specific currency in the state
         setCurrencies(prevCurrencies => 
-          prevCurrencies.map(currency => 
+          prevCurrencies.map(currency =>
             currency.id === (updatedItem as any).currency?.id ? (updatedItem as any).currency : currency
           )
         );
-
-        // Refresh base currency context if needed
-        if ((updatedItem as any).currency?.isBase) {
-          refreshBaseCurrency();
-        }
 
         if (modalType === 'add') {
           // For new currencies, add to state and handle exclusivity
@@ -1062,9 +1152,9 @@ const AdminDashboard: React.FC = () => {
             return newCurrencies;
           });
 
-          // Refresh base currency context if needed
+          // Update base currency context if needed
           if ((updatedItem as any).currency?.isBase) {
-            refreshBaseCurrency();
+            updateBaseCurrency((updatedItem as any).currency);
           }
 
           toast.success(`Currency "${(updatedItem as any).currency?.name || (updatedItem as any).currency?.code || 'Unknown'}" created successfully!`);
@@ -1152,7 +1242,15 @@ const AdminDashboard: React.FC = () => {
   );
   
   ///render currencies
-  const renderCurrencies = () => (
+  const renderCurrencies = () => {
+    // Debug log to see the current state
+    console.log('renderCurrencies - Current state:', {
+      currencies: currencies,
+      activeCount: currencies?.filter(c => c.isActive)?.length || 0,
+      activeCurrencies: currencies?.filter(c => c.isActive) || []
+    });
+    
+    return (
     <div className="space-y-6">
       <div className="bg-violet-50 rounded-2xl shadow-lg border border-violet-100/70 overflow-hidden">
         {/* Table Header */}
@@ -1166,8 +1264,77 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">Currencies</h2>
-                <p className="text-sm text-gray-600">Manage your store currencies and exchange rates</p>
+                <p className="text-sm text-gray-600">
+                  Manage your store currencies and exchange rates
+                  {currencies.find(c => c.isBase) && (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                      </svg>
+                      Base: {currencies.find(c => c.isBase)?.code}
+                    </span>
+                  )}
+                </p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Currency Summary */}
+        <div className={`px-6 py-4 border-b transition-colors duration-200 ${
+          isUpdatingCurrencies 
+            ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200/50' 
+            : currencyUpdateSuccess
+            ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200/50'
+            : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200/50'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <span className={`text-sm font-medium ${
+                  isUpdatingCurrencies ? 'text-yellow-900' : currencyUpdateSuccess ? 'text-green-900' : 'text-blue-900'
+                }`}>
+                  Active Currencies:
+                </span>
+                <span className={`text-sm px-2 py-1 rounded-full ${
+                  isUpdatingCurrencies 
+                    ? 'text-yellow-700 bg-yellow-100' 
+                    : currencyUpdateSuccess
+                    ? 'text-green-700 bg-green-100'
+                    : 'text-blue-700 bg-blue-100'
+                }`}>
+                  {currencies.filter(c => c.isActive).length}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className={`text-sm font-medium ${
+                  isUpdatingCurrencies ? 'text-yellow-900' : currencyUpdateSuccess ? 'text-green-900' : 'text-blue-900'
+                }`}>
+                  Total Currencies:
+                </span>
+                <span className={`text-sm px-2 py-1 rounded-full ${
+                  isUpdatingCurrencies 
+                    ? 'text-yellow-700 bg-yellow-100' 
+                    : currencyUpdateSuccess
+                    ? 'text-green-700 bg-green-100'
+                    : 'text-blue-700 bg-blue-100'
+                }`}>
+                  {currencies.length}
+                </span>
+              </div>
+            </div>
+            <div className={`text-xs flex items-center space-x-2 ${
+              isUpdatingCurrencies ? 'text-yellow-600' : currencyUpdateSuccess ? 'text-green-600' : 'text-blue-600'
+            }`}>
+              {isUpdatingCurrencies && (
+                <div className="w-3 h-3 animate-spin rounded-full border-2 border-yellow-600 border-t-transparent"></div>
+              )}
+              {currencyUpdateSuccess && (
+                <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+              {isUpdatingCurrencies ? 'Updating currencies...' : currencyUpdateSuccess ? 'Currency updated successfully!' : `Changes are applied immediately across the entire website${currencies.filter(c => c.isActive).length === 1 ? ' ⚠️ At least one currency must remain active' : ''}`}
             </div>
           </div>
         </div>
@@ -1204,7 +1371,13 @@ const AdminDashboard: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
                       {currency.isBase ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span 
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                          title="This is the base currency used throughout the website for price calculations and conversions"
+                        >
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                          </svg>
                           Base
                         </span>
                       ) : (
@@ -1214,9 +1387,27 @@ const AdminDashboard: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {currency.isActive ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Active
+                      {togglingCurrencyId === currency.id ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <div className="w-3 h-3 animate-spin rounded-full border-2 border-yellow-600 border-t-transparent mr-1"></div>
+                          Updating...
+                        </span>
+                      ) : currency.isActive ? (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          currencies.filter(c => c.isActive).length === 1 
+                            ? 'bg-orange-100 text-orange-800 border border-orange-200' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {currencies.filter(c => c.isActive).length === 1 ? (
+                            <>
+                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              Only Active
+                            </>
+                          ) : (
+                            'Active'
+                          )}
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -1228,28 +1419,41 @@ const AdminDashboard: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleView(currency)}
-                        className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
                         onClick={() => handleEdit(currency)}
                         className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleToggleCurrencyStatus(currency)}
-                        disabled={togglingCurrencyId === currency.id}
+                        onClick={() => {
+                          console.log('Currency toggle clicked:', {
+                            currencyId: currency.id,
+                            currencyName: currency.name,
+                            isActive: currency.isActive,
+                            isBase: currency.isBase,
+                            totalCurrencies: currencies.length,
+                            activeCurrencies: currencies.filter(c => c.isActive).length,
+                            canToggle: !(currency.isActive && currencies.filter(c => c.isActive).length === 1)
+                          });
+                          handleToggleCurrencyStatus(currency);
+                        }}
+                        disabled={togglingCurrencyId === currency.id || (currency.isActive && currencies.filter(c => c.isActive).length === 1)}
                         className={`p-1 rounded transition-colors ${
                           togglingCurrencyId === currency.id
                             ? 'opacity-50 cursor-not-allowed'
-                            : currency.isActive 
-                              ? 'text-green-600 hover:text-green-900 hover:bg-green-50' 
-                              : 'text-orange-600 hover:text-orange-900 hover:bg-orange-50'
+                            : (currency.isActive && currencies.filter(c => c.isActive).length === 1)
+                              ? 'text-gray-400 cursor-not-allowed'
+                              : currency.isActive 
+                                ? 'text-green-600 hover:text-green-900 hover:bg-green-50' 
+                                : 'text-orange-600 hover:text-orange-900 hover:bg-orange-50'
                         }`}
-                        title={currency.isActive ? 'Deactivate' : 'Activate'}
+                        title={
+                          currency.isActive && currencies.filter(c => c.isActive).length === 1
+                            ? 'Cannot deactivate the only active currency'
+                            : currency.isActive 
+                              ? 'Deactivate' 
+                              : 'Activate'
+                        }
                       >
                         {togglingCurrencyId === currency.id ? (
                           <div className="w-4 h-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
@@ -1289,7 +1493,8 @@ const AdminDashboard: React.FC = () => {
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   ///render users 
   const renderUsers = () => (
