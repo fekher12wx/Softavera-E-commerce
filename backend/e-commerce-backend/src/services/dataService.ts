@@ -706,8 +706,10 @@ export class DatabaseService {
         const baseUpdateResult = await pool.query('UPDATE currencies SET is_base = false WHERE is_base = true');
       }
 
-      // Note: Multiple currencies can be active at the same time
-      // No need to deactivate others when setting a currency as active
+      // If this currency is being set as active, deactivate all others first
+      if (currencyData.isActive) {
+        await pool.query('UPDATE currencies SET is_active = false');
+      }
       
       const result = await pool.query(
         `INSERT INTO currencies (id, name, code, symbol, is_active, exchange_rate, is_base, created_at, updated_at) 
@@ -745,8 +747,10 @@ export class DatabaseService {
         const baseUpdateResult = await pool.query('UPDATE currencies SET is_base = false WHERE is_base = true');
       }
 
-      // Note: Multiple currencies can be active at the same time
-      // No need to deactivate others when setting a currency as active
+      // If this currency is being set as active, deactivate all others first
+      if (updateData.isActive) {
+        await pool.query('UPDATE currencies SET is_active = false WHERE id != $1', [id]);
+      }
 
       // Build dynamic update query
       if (updateData.name !== undefined) {
@@ -860,6 +864,14 @@ export class DatabaseService {
           }
         }
         
+        // If we're activating a currency, deactivate all others first
+        if (newStatus) {
+          await client.query(
+            'UPDATE currencies SET is_active = false, updated_at = $1 WHERE id != $2',
+            [new Date(), id]
+          );
+        }
+        
         // Update the specific currency
         const result = await client.query(
           'UPDATE currencies SET is_active = $1, updated_at = $2 WHERE id = $3 RETURNING *',
@@ -896,21 +908,17 @@ export class DatabaseService {
         throw new Error('Currency not found');
       }
       
-      if (!currencyResult.rows[0].is_active) {
-        throw new Error('Cannot set inactive currency as base currency');
-      }
-      
       // Start a transaction
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
         
-        // Set all currencies as non-base first
-        await client.query('UPDATE currencies SET is_base = false, updated_at = $1', [new Date()]);
+        // Set all currencies as non-base and non-active first
+        await client.query('UPDATE currencies SET is_base = false, is_active = false, updated_at = $1', [new Date()]);
         
-        // Set the specified currency as base
+        // Set the specified currency as base AND active
         const result = await client.query(
-          'UPDATE currencies SET is_base = true, updated_at = $1 WHERE id = $2 RETURNING *',
+          'UPDATE currencies SET is_base = true, is_active = true, updated_at = $1 WHERE id = $2 RETURNING *',
           [new Date(), id]
         );
         
@@ -1479,6 +1487,8 @@ export class DatabaseService {
             company_address VARCHAR(255) DEFAULT '123 Business Street',
             company_city VARCHAR(255) DEFAULT 'Tunis',
             company_country VARCHAR(255) DEFAULT 'Tunisia',
+            company_phone VARCHAR(255) DEFAULT '+216 71 234 567',
+            company_quote TEXT DEFAULT '',
             payment_text VARCHAR(255) DEFAULT 'Payment to E-Shop',
             logo_url TEXT DEFAULT '',
             primary_color VARCHAR(7) DEFAULT '#8B5CF6',
@@ -1487,6 +1497,7 @@ export class DatabaseService {
             fiscal_number VARCHAR(255) DEFAULT '',
             tax_registration_number VARCHAR(255) DEFAULT '',
             siret_number VARCHAR(255) DEFAULT '',
+            fiscal_information TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
@@ -1528,7 +1539,13 @@ export class DatabaseService {
         accentColor: '#3B82F6',
         fiscalNumber: '',
         taxRegistrationNumber: '',
-        siretNumber: ''
+        siretNumber: '',
+        fiscalField1Label: 'champ 1',
+        fiscalField1Value: '',
+        fiscalField2Label: 'champ 2',
+        fiscalField2Value: '',
+        fiscalField3Label: 'champ 3',
+        fiscalField3Value: ''
       };
     }
   }
@@ -1556,16 +1573,19 @@ export class DatabaseService {
             company_address = $5,
             company_city = $6,
             company_country = $7,
-            payment_text = $8,
-            logo_url = $9,
-            primary_color = $10,
-            secondary_color = $11,
-            accent_color = $12,
-            fiscal_number = $13,
-            tax_registration_number = $14,
-            siret_number = $15,
-            updated_at = $16
-          WHERE id = $17
+            company_phone = $8,
+            company_quote = $9,
+            payment_text = $10,
+            logo_url = $11,
+            primary_color = $12,
+            secondary_color = $13,
+            accent_color = $14,
+            fiscal_number = $15,
+            tax_registration_number = $16,
+            siret_number = $17,
+            fiscal_information = $18,
+            updated_at = $19
+          WHERE id = $20
           RETURNING *
         `, [
           settings.companyName || 'E-Shop',
@@ -1575,6 +1595,8 @@ export class DatabaseService {
           settings.companyAddress || '123 Business Street',
           settings.companyCity || 'Tunis',
           settings.companyCountry || 'Tunisia',
+          settings.companyPhone || '+216 71 234 567',
+          settings.companyQuote || '',
           settings.paymentText || 'Payment to E-Shop',
           settings.logoUrl || '',
           settings.primaryColor || '#8B5CF6',
@@ -1583,6 +1605,7 @@ export class DatabaseService {
           settings.fiscalNumber || '',
           settings.taxRegistrationNumber || '',
           settings.siretNumber || '',
+          settings.fiscalInformation || '',
           now,
           checkResult.rows[0].id
         ]);
@@ -1591,11 +1614,12 @@ export class DatabaseService {
         result = await pool.query(`
           INSERT INTO invoice_settings (
             company_name, company_tagline, company_email, company_website,
-            company_address, company_city, company_country, payment_text,
-            logo_url, primary_color, secondary_color, accent_color,
+            company_address, company_city, company_country, company_phone, company_quote,
+            payment_text, logo_url, primary_color, secondary_color, accent_color,
             fiscal_number, tax_registration_number, siret_number,
+            fiscal_information,
             created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
           RETURNING *
         `, [
           settings.companyName || 'E-Shop',
@@ -1605,6 +1629,8 @@ export class DatabaseService {
           settings.companyAddress || '123 Business Street',
           settings.companyCity || 'Tunis',
           settings.companyCountry || 'Tunisia',
+          settings.companyPhone || '+216 71 234 567',
+          settings.companyQuote || '',
           settings.paymentText || 'Payment to E-Shop',
           settings.logoUrl || '',
           settings.primaryColor || '#8B5CF6',
@@ -1613,6 +1639,7 @@ export class DatabaseService {
           settings.fiscalNumber || '',
           settings.taxRegistrationNumber || '',
           settings.siretNumber || '',
+          settings.fiscalInformation || '',
           now,
           now
         ]);
@@ -1634,6 +1661,8 @@ export class DatabaseService {
       companyAddress: row.company_address,
       companyCity: row.company_city,
       companyCountry: row.company_country,
+      companyPhone: row.company_phone || '+216 71 234 567',
+      companyQuote: row.company_quote || '',
       paymentText: row.payment_text,
       logoUrl: row.logo_url,
       primaryColor: row.primary_color,
@@ -1641,7 +1670,8 @@ export class DatabaseService {
       accentColor: row.accent_color,
       fiscalNumber: row.fiscal_number,
       taxRegistrationNumber: row.tax_registration_number,
-      siretNumber: row.siret_number
+      siretNumber: row.siret_number,
+      fiscalInformation: row.fiscal_information || ''
     };
   }
 }

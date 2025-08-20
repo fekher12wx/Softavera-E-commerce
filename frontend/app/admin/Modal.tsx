@@ -929,28 +929,7 @@ function Modal({
               isViewMode={isViewMode}
               placeholder="1.0000"
             />
-            <div className="md:col-span-2">
-              <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  name="isActive"
-                  checked={formData.isActive !== false}
-                  onChange={(e) => {
-                    setFormData((prev: any) => ({ ...prev, isActive: e.target.checked }));
-                  }}
-                  disabled={isViewMode}
-                  className="w-5 h-5 text-purple-600 bg-white border-2 border-gray-300 rounded focus:ring-purple-500 focus:ring-2 focus:border-purple-500 transition-all duration-200 disabled:opacity-50"
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-gray-700">
-                    Active
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    Active currencies will be available for use. Only one currency can be active at a time.
-                  </span>
-                </div>
-              </label>
-            </div>
+
             <div className="md:col-span-2">
               <label className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
                 <input
@@ -977,7 +956,7 @@ function Modal({
         </SectionCard>
       </div>
     );
-  }, [formData.isActive, formData.name, formData.code, formData.symbol, formData.exchangeRate, formData.isBase, isViewMode, handleChange, SectionCard]);
+  }, [formData.name, formData.code, formData.symbol, formData.exchangeRate, formData.isBase, isViewMode, handleChange, SectionCard]);
 
   const renderOrderFields = useCallback(() => {
     // Helper function to get nested value from formData

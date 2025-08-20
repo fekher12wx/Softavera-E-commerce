@@ -81,7 +81,7 @@ const TabBar = ({
         textColor: 'text-yellow-600'
       },
       invoiceSettings: { 
-        label: 'Invoice Settings', 
+        label: 'Settings', 
         icon: Settings, 
         count: undefined,
         color: 'from-slate-500 to-gray-500',

@@ -17,6 +17,7 @@ export interface BaseCurrency {
 interface CurrencyContextType {
   baseCurrency: BaseCurrency | null;
   setBaseCurrency: (currency: BaseCurrency | null) => void;
+  updateBaseCurrency: (currency: BaseCurrency) => void;
   refreshBaseCurrency: () => Promise<void>;
   loading: boolean;
   error: string | null;
@@ -75,6 +76,10 @@ export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children }) 
     await fetchBaseCurrency();
   };
 
+  const updateBaseCurrency = (currency: BaseCurrency) => {
+    setBaseCurrency(currency);
+  };
+
   useEffect(() => {
     fetchBaseCurrency();
   }, []);
@@ -82,6 +87,7 @@ export const CurrencyProvider: React.FC<CurrencyProviderProps> = ({ children }) 
   const value: CurrencyContextType = {
     baseCurrency,
     setBaseCurrency,
+      updateBaseCurrency,
     refreshBaseCurrency,
     loading,
     error,

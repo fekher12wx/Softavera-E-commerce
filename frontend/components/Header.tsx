@@ -9,21 +9,9 @@ import AuthModal from './AuthModal';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useLanguage } from '../lib/languageContext';
 import { useLogo } from '../app/contexts/LogoContext';
+import { useInvoiceSettings } from '../app/contexts/InvoiceSettingsContext';
 
-interface InvoiceSettings {
-  companyName: string;
-  companyTagline: string;
-  companyEmail: string;
-  companyWebsite: string;
-  companyAddress: string;
-  companyCity: string;
-  companyCountry: string;
-  paymentText: string;
-  logoUrl: string;
-  primaryColor: string;
-  secondaryColor: string;
-  accentColor: string;
-}
+
 
 type User = {
   id: string;
@@ -53,6 +41,7 @@ const Header: React.FC = () => {
   const { itemCount } = useCart();
   const { t } = useLanguage();
   const { currentLogo } = useLogo(); // Use global logo context
+  const { settings: invoiceSettings } = useInvoiceSettings(); // Use invoice settings context
   const [showAuth, setShowAuth] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [email, setEmail] = useState('');
@@ -300,7 +289,7 @@ const Header: React.FC = () => {
                 </div>
               )}
               <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-300 via-orange-300 to-red-300 bg-clip-text text-transparent">
-                E-Shop
+                {invoiceSettings.companyName}
               </h1>
             </div>
             <div className="flex items-center space-x-8">
@@ -332,13 +321,13 @@ const Header: React.FC = () => {
             )}
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-yellow-300 via-orange-300 to-red-300 bg-clip-text text-transparent">
-                E-Shop
+                {invoiceSettings.companyName}
               </h1>
-              {/* invoiceSettings.companyTagline && (
+              {invoiceSettings.companyTagline && (
                 <p className="text-xs text-white/80 -mt-1">
                   {invoiceSettings.companyTagline}
                 </p>
-              ) */}
+              )}
             </div>
           </Link>
 

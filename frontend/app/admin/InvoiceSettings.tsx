@@ -2,45 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Building, Palette, Eye, Upload, Save, RotateCcw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useLogo } from '../contexts/LogoContext';
+import { useInvoiceSettings, type InvoiceSettings } from '../contexts/InvoiceSettingsContext';
 
-interface InvoiceSettings {
-  companyName: string;
-  companyTagline: string;
-  companyEmail: string;
-  companyWebsite: string;
-  companyAddress: string;
-  companyCity: string;
-  companyCountry: string;
-  paymentText: string;
-  logoUrl: string;
-  primaryColor: string;
-  secondaryColor: string;
-  accentColor: string;
-  fiscalNumber: string;
-  taxRegistrationNumber: string;
-  siretNumber: string;
-}
+
 
 const InvoiceSettings: React.FC = () => {
   const { updateLogo } = useLogo(); // Use global logo context
-  const [settings, setSettings] = useState<InvoiceSettings>({
-    companyName: 'E-Shop',
-    companyTagline: 'Your Trusted Online Store',
-    companyEmail: 'contact@e-shop.com',
-    companyWebsite: 'e-shop.com',
-    companyAddress: '123 Business Street',
-    companyCity: 'Tunis',
-    companyCountry: 'Tunisia',
-    paymentText: 'Payment to E-Shop',
-    logoUrl: '',
-    primaryColor: '#8B5CF6',
-    secondaryColor: '#EC4899',
-    accentColor: '#3B82F6',
-    fiscalNumber: '',
-    taxRegistrationNumber: '',
-    siretNumber: ''
-  });
-
+  const { settings, pendingSettings, updatePendingSettings, updateSettings, refreshSettings, commitPendingSettings } = useInvoiceSettings(); // Use shared context
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('company');
@@ -50,13 +18,18 @@ const InvoiceSettings: React.FC = () => {
     loadSettings();
   }, []);
 
+  useEffect(() => {
+    // Settings changed
+  }, [settings]);
+
   // Load settings from backend
   const loadSettings = async () => {
     try {
       const response = await fetch('http://localhost:3001/api/settings/invoice');
       if (response.ok) {
         const data = await response.json();
-        setSettings(data.settings);
+        updateSettings(data.settings); // Update the shared context
+        updatePendingSettings(data.settings); // Also update pending settings
         // If there's a saved logo, load it and update header
         if (data.settings.logoUrl) {
           setLogoPreview(data.settings.logoUrl);
@@ -93,8 +66,7 @@ const InvoiceSettings: React.FC = () => {
           const img = new Image();
           img.onload = () => {
             setLogoPreview(result);
-            // Update header logo immediately for real-time preview
-            updateLogo(result);
+            // Don't update header logo immediately - only on save
             toast.success('Logo loaded successfully!');
           };
           img.onerror = () => {
@@ -118,8 +90,8 @@ const InvoiceSettings: React.FC = () => {
     setLoading(true);
     try {
       // First upload logo if there's a new one
-      let logoUrl = settings.logoUrl;
-      if (logoPreview && logoPreview !== settings.logoUrl) {
+      let logoUrl = pendingSettings.logoUrl;
+      if (logoPreview && logoPreview !== pendingSettings.logoUrl) {
         const formData = new FormData();
         const fileInput = document.getElementById('logo-upload') as HTMLInputElement;
         if (fileInput?.files?.[0]) {
@@ -136,9 +108,8 @@ const InvoiceSettings: React.FC = () => {
           if (uploadResponse.ok) {
             const uploadData = await uploadResponse.json();
             logoUrl = uploadData.logoUrl;
-            setSettings(prev => ({ ...prev, logoUrl }));
-            // Update header logo with the uploaded URL
-            updateLogo(logoUrl);
+            updatePendingSettings({ ...pendingSettings, logoUrl }); // Update pending settings
+            // Don't update header logo immediately - only on commit
           } else {
             const errorText = await uploadResponse.text();
             toast.error(`Logo upload failed: ${uploadResponse.status} - ${errorText}`);
@@ -158,7 +129,7 @@ const InvoiceSettings: React.FC = () => {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify({
-          ...settings,
+          ...pendingSettings,
           logoUrl
         })
       });
@@ -167,11 +138,17 @@ const InvoiceSettings: React.FC = () => {
         const saveData = await saveResponse.json();
         toast.success('Settings saved successfully!');
         // Update local state with the new logo URL
-        if (logoUrl !== settings.logoUrl) {
+        if (logoUrl !== pendingSettings.logoUrl) {
           setLogoPreview(logoUrl);
-          // Call the callback to update header logo in real-time
+        }
+        // Commit pending settings to update the header (including logo)
+        commitPendingSettings();
+        // Update header logo after committing settings
+        if (logoUrl) {
           updateLogo(logoUrl);
         }
+        // Refresh the shared context to ensure all components are updated
+        await refreshSettings();
       } else {
         const errorText = await saveResponse.text();
         toast.error(`Failed to save settings: ${saveResponse.status} - ${errorText}`);
@@ -184,7 +161,7 @@ const InvoiceSettings: React.FC = () => {
   };
 
   const handleReset = () => {
-    setSettings({
+    updatePendingSettings({
       companyName: '',
       companyTagline: '',
       companyEmail: '',
@@ -192,20 +169,20 @@ const InvoiceSettings: React.FC = () => {
       companyAddress: '',
       companyCity: '',
       companyCountry: '',
+      companyPhone: '',
       paymentText: '',
       logoUrl: '',
       primaryColor: '#8B5CF6',
       secondaryColor: '#EC4899',
       accentColor: '#3B82F6',
-      fiscalNumber: '',
-      taxRegistrationNumber: '',
-      siretNumber: ''
+      fiscalInformation: ''
     });
     setLogoPreview('');
   };
 
   const updateField = (field: keyof InvoiceSettings, value: string) => {
-    setSettings(prev => ({ ...prev, [field]: value }));
+    const newSettings = { ...pendingSettings, [field]: value };
+    updatePendingSettings(newSettings);
   };
 
   const tabs = [
@@ -226,22 +203,22 @@ const InvoiceSettings: React.FC = () => {
                 <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-white/20 bg-white/10">
                   <img src={logoPreview} alt="Company Logo" className="w-full h-full object-contain" />
                 </div>
-              ) : settings.logoUrl ? (
+              ) : pendingSettings.logoUrl ? (
                 <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-white/20 bg-white/10">
-                  <img src={settings.logoUrl} alt="Company Logo" className="w-full h-full object-contain" />
+                  <img src={pendingSettings.logoUrl} alt="Company Logo" className="w-full h-full object-contain" />
                 </div>
               ) : (
                 <div 
                   className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-bold text-xl border-2 border-white/20 bg-white/10"
-                  style={{ backgroundColor: settings.primaryColor }}
+                  style={{ backgroundColor: pendingSettings.primaryColor }}
                 >
-                  {settings.companyName.charAt(0) || 'C'}
+                  {pendingSettings.companyName.charAt(0) || 'C'}
                 </div>
               )}
               <div>
-                <h1 className="text-2xl font-bold text-white">Invoice Settings</h1>
+                <h1 className="text-2xl font-bold text-white">Settings</h1>
                 <p className="text-purple-100 mt-1">
-                  {settings.companyName || 'Company Name'} - Customize your invoice appearance
+                  {pendingSettings.companyName || 'Company Name'} - Customize your settings
                 </p>
               </div>
             </div>
@@ -275,6 +252,8 @@ const InvoiceSettings: React.FC = () => {
           {/* Settings Panel */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-xl p-8 border border-slate-200">
+
+              
               {activeTab === 'company' && (
                 <div className="space-y-6">
                   <h3 className="text-xl font-semibold text-slate-800 mb-6">Company Information</h3>
@@ -284,7 +263,7 @@ const InvoiceSettings: React.FC = () => {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Company Name</label>
                       <input
                         type="text"
-                        value={settings.companyName}
+                        value={pendingSettings.companyName || ''}
                         onChange={(e) => updateField('companyName', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors"
                         placeholder="Your Company Name"
@@ -295,7 +274,7 @@ const InvoiceSettings: React.FC = () => {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Tagline</label>
                       <input
                         type="text"
-                        value={settings.companyTagline}
+                        value={pendingSettings.companyTagline || ''}
                         onChange={(e) => updateField('companyTagline', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 transition-colors"
                         placeholder="Your Company Tagline"
@@ -306,7 +285,7 @@ const InvoiceSettings: React.FC = () => {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Email</label>
                       <input
                         type="email"
-                        value={settings.companyEmail}
+                        value={pendingSettings.companyEmail || ''}
                         onChange={(e) => updateField('companyEmail', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 transition-colors"
                         placeholder="contact@company.com"
@@ -317,7 +296,7 @@ const InvoiceSettings: React.FC = () => {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Website</label>
                       <input
                         type="text"
-                        value={settings.companyWebsite}
+                        value={pendingSettings.companyWebsite || ''}
                         onChange={(e) => updateField('companyWebsite', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 transition-colors"
                         placeholder="company.com"
@@ -328,7 +307,7 @@ const InvoiceSettings: React.FC = () => {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Address</label>
                       <input
                         type="text"
-                        value={settings.companyAddress}
+                        value={pendingSettings.companyAddress || ''}
                         onChange={(e) => updateField('companyAddress', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 transition-colors"
                         placeholder="Street Address"
@@ -339,7 +318,7 @@ const InvoiceSettings: React.FC = () => {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">City</label>
                       <input
                         type="text"
-                        value={settings.companyCity}
+                        value={pendingSettings.companyCity || ''}
                         onChange={(e) => updateField('companyCity', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 transition-colors"
                         placeholder="City"
@@ -350,10 +329,32 @@ const InvoiceSettings: React.FC = () => {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Country</label>
                       <input
                         type="text"
-                        value={settings.companyCountry}
+                        value={pendingSettings.companyCountry || ''}
                         onChange={(e) => updateField('companyCountry', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 transition-colors"
                         placeholder="Country"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Phone</label>
+                      <input
+                        type="tel"
+                        value={pendingSettings.companyPhone || ''}
+                        onChange={(e) => updateField('companyPhone', e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 transition-colors"
+                        placeholder="+216 99 999 999"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Website</label>
+                      <input
+                        type="url"
+                        value={pendingSettings.companyWebsite || ''}
+                        onChange={(e) => updateField('companyWebsite', e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 transition-colors"
+                        placeholder="https://www.example.com"
                       />
                     </div>
 
@@ -361,7 +362,7 @@ const InvoiceSettings: React.FC = () => {
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Payment Text</label>
                       <input
                         type="text"
-                        value={settings.paymentText}
+                        value={pendingSettings.paymentText || ''}
                         onChange={(e) => updateField('paymentText', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors"
                         placeholder="Payment instructions"
@@ -373,38 +374,18 @@ const InvoiceSettings: React.FC = () => {
                       <h4 className="text-lg font-semibold text-slate-800 mb-4 border-b border-slate-200 pb-2">Fiscal Information</h4>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">Fiscal Number</label>
-                      <input
-                        type="text"
-                        value={settings.fiscalNumber}
-                        onChange={(e) => updateField('fiscalNumber', e.target.value)}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Fiscal Information</label>
+                      <textarea
+                        value={pendingSettings.fiscalInformation || ''}
+                        onChange={(e) => updateField('fiscalInformation', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors"
-                        placeholder="Fiscal Number"
+                        placeholder="Enter fiscal information (e.g., Tax ID: 123456, VAT: FR12345678901)"
+                        rows={3}
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">Tax Registration Number</label>
-                      <input
-                        type="text"
-                        value={settings.taxRegistrationNumber}
-                        onChange={(e) => updateField('taxRegistrationNumber', e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors"
-                        placeholder="Tax Registration Number"
-                      />
-                    </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">SIRET Number</label>
-                      <input
-                        type="text"
-                        value={settings.siretNumber}
-                        onChange={(e) => updateField('siretNumber', e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors"
-                        placeholder="SIRET Number"
-                      />
-                    </div>
                   </div>
                 </div>
               )}
@@ -440,14 +421,14 @@ const InvoiceSettings: React.FC = () => {
                               }}
                             />
                           </div>
-                        ) : settings.logoUrl ? (
+                        ) : pendingSettings.logoUrl ? (
                           <div className="w-full h-32 bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center">
                             <img 
-                              src={settings.logoUrl} 
+                              src={pendingSettings.logoUrl} 
                               alt="Logo preview" 
                               className="w-24 h-24 object-contain" 
                               onError={(e) => {
-                                console.error('Image failed to load:', settings.logoUrl);
+                                console.error('Image failed to load:', pendingSettings.logoUrl);
                                 toast.error('Failed to load saved logo');
                               }}
                             />
@@ -475,19 +456,19 @@ const InvoiceSettings: React.FC = () => {
                           <div className="relative">
                             <input
                               type="color"
-                              value={settings[color.field]}
+                              value={pendingSettings[color.field] || '#000000'}
                               onChange={(e) => updateField(color.field, e.target.value)}
                               className="w-16 h-12 border-2 border-slate-200 rounded-xl cursor-pointer"
                             />
                             <div 
                               className="absolute inset-1 rounded-lg pointer-events-none"
-                              style={{ backgroundColor: settings[color.field] }}
+                              style={{ backgroundColor: pendingSettings[color.field] }}
                             />
                           </div>
                           <div className="flex-1">
                             <input
                               type="text"
-                              value={settings[color.field]}
+                              value={pendingSettings[color.field] || ''}
                               onChange={(e) => updateField(color.field, e.target.value)}
                               className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-0 transition-colors font-mono"
                             />
@@ -512,29 +493,29 @@ const InvoiceSettings: React.FC = () => {
                           <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200">
                             <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
                           </div>
-                        ) : settings.logoUrl ? (
+                        ) : pendingSettings.logoUrl ? (
                           <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200">
-                            <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                            <img src={pendingSettings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
                           </div>
                         ) : (
                           <div 
                             className="w-20 h-20 rounded-xl flex items-center justify-center text-white font-bold text-xl border-2"
                             style={{ 
-                              backgroundColor: settings.primaryColor,
-                              borderColor: settings.primaryColor
+                              backgroundColor: pendingSettings.primaryColor,
+                              borderColor: pendingSettings.primaryColor
                             }}
                           >
-                            {settings.companyName.charAt(0) || 'C'}
+                            {pendingSettings.companyName.charAt(0) || 'C'}
                           </div>
                         )}
                         <div>
                           <h1 
                             className="text-2xl font-bold"
-                            style={{ color: settings.primaryColor }}
+                            style={{ color: pendingSettings.primaryColor }}
                           >
-                            {settings.companyName || 'Company Name'}
+                            {pendingSettings.companyName || 'Company Name'}
                           </h1>
-                          <p className="text-slate-600">{settings.companyTagline || 'Your company tagline'}</p>
+                          <p className="text-slate-600">{pendingSettings.companyTagline || 'Your company tagline'}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -551,21 +532,19 @@ const InvoiceSettings: React.FC = () => {
                     {/* Company Details */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                       <div>
-                        <h3 className="font-semibold text-slate-800 mb-3">From:</h3>
                         <div className="space-y-1 text-slate-600">
-                          <p>{settings.companyEmail || 'contact@company.com'}</p>
-                          <p>{settings.companyWebsite || 'e-shop.com'}</p>
-                          <p>{settings.companyAddress || '123 Business Street'}</p>
-                          <p>{settings.companyCity || 'Tunis'}, {settings.companyCountry || 'Tunisia'}</p>
-                          {settings.fiscalNumber && (
-                            <p className="text-sm text-slate-500">Fiscal: {settings.fiscalNumber}</p>
+                          <p>{pendingSettings.companyAddress || '123 Business Street'}</p>
+                          <p>{pendingSettings.companyCity || 'Tunis'}, {pendingSettings.companyCountry || 'Tunisia'}</p>
+                          {pendingSettings.companyEmail && (
+                            <p className="text-sm text-slate-500">{pendingSettings.companyEmail}</p>
                           )}
-                          {settings.taxRegistrationNumber && (
-                            <p className="text-sm text-slate-500">Tax Reg: {settings.taxRegistrationNumber}</p>
+                          {pendingSettings.companyPhone && (
+                            <p className="text-sm text-slate-500">{pendingSettings.companyPhone}</p>
                           )}
-                          {settings.siretNumber && (
-                            <p className="text-sm text-slate-500">SIRET: {settings.siretNumber}</p>
+                          {pendingSettings.companyWebsite && (
+                            <p className="text-sm text-slate-500">{pendingSettings.companyWebsite}</p>
                           )}
+                        
                         </div>
                       </div>
                       
@@ -631,6 +610,55 @@ const InvoiceSettings: React.FC = () => {
                     >
                       <p className="font-semibold">{settings.paymentText || 'Payment instructions will appear here'}</p>
                     </div>
+
+                    {/* Footer with company information */}
+                    <div className="pt-4 border-t border-gray-200">
+                      {/* Company Information Section */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                        {/* Left side - Company Details */}
+                        <div className="text-xs text-gray-600">
+                          <h4 className="font-semibold text-gray-800 mb-2" style={{ color: settings.primaryColor }}>
+                            {settings.companyName}
+                          </h4>
+                          <div className="space-y-1">
+                            {settings.companyAddress && (
+                              <div>{settings.companyAddress}</div>
+                            )}
+                            {(settings.companyCity || settings.companyCountry) && (
+                              <div>
+                                {settings.companyCity && `${settings.companyCity}`}
+                                {settings.companyCity && settings.companyCountry && ', '}
+                                {settings.companyCountry}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right side - Fiscal Information */}
+                        <div className="text-xs text-gray-600 text-right">
+                          <h4 className="font-semibold text-gray-800 mb-2" style={{ color: settings.primaryColor }}>
+                            Informations Fiscales
+                          </h4>
+                          <div className="space-y-1">
+                            {settings.fiscalInformation && (
+                              <div>
+                                {settings.fiscalInformation.split('\n').map((line, index) => (
+                                  <div key={index}>{line}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Thank You Message */}
+                      <div 
+                        className="text-center text-xs font-semibold"
+                        style={{ color: settings.primaryColor }}
+                      >
+                        Merci
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -669,43 +697,49 @@ const InvoiceSettings: React.FC = () => {
                      <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-300">
                        <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
                      </div>
-                   ) : settings.logoUrl ? (
+                   ) : pendingSettings.logoUrl ? (
                      <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-300">
-                       <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                       <img src={pendingSettings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
                      </div>
                    ) : (
                      <div 
                        className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                       style={{ backgroundColor: settings.primaryColor }}
+                       style={{ backgroundColor: pendingSettings.primaryColor }}
                      >
-                       {settings.companyName.charAt(0) || 'C'}
+                       {pendingSettings.companyName.charAt(0) || 'C'}
                      </div>
                    )}
                   <div>
                     <h3 
                       className="font-bold text-sm"
-                      style={{ color: settings.primaryColor }}
+                      style={{ color: pendingSettings.primaryColor }}
                     >
-                      {settings.companyName || 'Company Name'}
+                      {pendingSettings.companyName || 'Company Name'}
                     </h3>
-                    <p className="text-xs text-slate-500">{settings.companyTagline || 'Tagline'}</p>
+                    <p className="text-xs text-slate-500">{pendingSettings.companyTagline || 'Tagline'}</p>
                   </div>
                 </div>
                 
                 <div className="text-xs text-slate-600 space-y-1">
-                  <div>{settings.companyEmail || 'email@company.com'}</div>
-                  <div>{settings.companyWebsite || 'company.com'}</div>
                   <div>
-                    {settings.companyAddress || 'Address'}, {settings.companyCity || 'City'}, {settings.companyCountry || 'Country'}
+                    {pendingSettings.companyAddress || 'Address'}, {pendingSettings.companyCity || 'City'}, {pendingSettings.companyCountry || 'Country'}
                   </div>
-                  {settings.fiscalNumber && (
-                    <div className="text-xs text-slate-500">Fiscal: {settings.fiscalNumber}</div>
+                  {pendingSettings.companyEmail && (
+                    <div className="text-xs text-slate-500">{pendingSettings.companyEmail}</div>
                   )}
-                  {settings.taxRegistrationNumber && (
-                    <div className="text-xs text-slate-500">Tax Reg: {settings.taxRegistrationNumber}</div>
+                  {pendingSettings.companyPhone && (
+                    <div className="text-xs text-slate-500">{pendingSettings.companyPhone}</div>
                   )}
-                  {settings.siretNumber && (
-                    <div className="text-xs text-slate-500">SIRET: {settings.siretNumber}</div>
+                  {pendingSettings.companyWebsite && (
+                    <div className="text-xs text-slate-500">{pendingSettings.companyWebsite}</div>
+                  )}
+                 
+                  {pendingSettings.fiscalInformation && (
+                    <div className="text-xs text-slate-500">
+                      {pendingSettings.fiscalInformation.split('\n').map((line, index) => (
+                        <div key={index}>{line}</div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
@@ -713,30 +747,52 @@ const InvoiceSettings: React.FC = () => {
                   <div className="flex gap-2">
                     <div 
                       className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: settings.primaryColor }}
+                      style={{ backgroundColor: pendingSettings.primaryColor }}
                     />
                     <div 
                       className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: settings.secondaryColor }}
+                      style={{ backgroundColor: pendingSettings.secondaryColor }}
                     />
                     <div 
                       className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: settings.accentColor }}
+                      style={{ backgroundColor: pendingSettings.accentColor }}
                     />
                   </div>
                 </div>
               </div>
               
-              <div className="mt-4 p-3 rounded-lg" style={{ backgroundColor: `${settings.primaryColor}15` }}>
+              <div className="mt-4 p-3 rounded-lg" style={{ backgroundColor: `${pendingSettings.primaryColor}15` }}>
                 <p className="text-xs text-slate-600">
                   <span 
                     className="font-semibold"
-                    style={{ color: settings.primaryColor }}
+                    style={{ color: pendingSettings.primaryColor }}
                   >
                     Payment: 
                   </span>
-                  {' ' + (settings.paymentText || 'Payment instructions')}
+                  {' ' + (pendingSettings.paymentText || 'Payment instructions')}
                 </p>
+              </div>
+
+              {/* Footer Preview */}
+              <div className="mt-4 pt-3 border-t border-slate-300">
+                <div className="text-xs text-slate-600 space-y-1">
+                  <div className="font-medium" style={{ color: pendingSettings.primaryColor }}>
+                    {pendingSettings.companyName || 'Company Name'}
+                  </div>
+                  <div>{pendingSettings.companyAddress || 'Address'}, {pendingSettings.companyCity || 'City'}, {pendingSettings.companyCountry || 'Country'}</div>
+                  
+                  {/* Fiscal Information Preview */}
+                  {pendingSettings.fiscalInformation && (
+                    <div className="mt-2 pt-2 border-t border-slate-200">
+                      <div className="font-medium text-slate-700 mb-1">Informations Fiscales:</div>
+                      <div className="text-xs">
+                        {pendingSettings.fiscalInformation.split('\n').map((line, index) => (
+                          <div key={index}>{line}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

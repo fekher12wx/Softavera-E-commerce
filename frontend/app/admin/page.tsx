@@ -22,6 +22,7 @@ import NotificationDropdown from './NotificationDropdown';
 import StatsCards from './StatsCards';
 import TabBar from './TabBar';
 import { useLogo } from '../contexts/LogoContext';
+import CustomToast from '../../components/CustomToast';
 
 
 
@@ -51,6 +52,8 @@ const AdminDashboard: React.FC = () => {
   const [togglingCurrencyId, setTogglingCurrencyId] = useState<string | null>(null);
   const [isUpdatingCurrencies, setIsUpdatingCurrencies] = useState(false);
   const [currencyUpdateSuccess, setCurrencyUpdateSuccess] = useState(false);
+  const [showKonnectConfirm, setShowKonnectConfirm] = useState(false);
+  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<PaymentMethod | null>(null);
   const { currentLogo, updateLogo } = useLogo();
 
   useEffect(() => {
@@ -680,13 +683,10 @@ const AdminDashboard: React.FC = () => {
       
       // If we're activating a payment method, show confirmation dialog
       if (newActiveStatus) {
-        const confirmMessage = `Do you want to activate "${paymentMethod.name}" and deactivate all other payment methods?`;
-        const userConfirmed = window.confirm(confirmMessage);
-        
-        if (!userConfirmed) {
-          console.log('User cancelled payment method activation');
-          return;
-        }
+        // Store the pending payment method and show custom toast
+        setPendingPaymentMethod(paymentMethod);
+        setShowKonnectConfirm(true);
+        return; // Don't proceed yet, wait for user confirmation
       }
       
       console.log(`Toggling payment method ${paymentMethod.name} to ${newActiveStatus ? 'active' : 'inactive'}`);
@@ -728,6 +728,112 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const confirmKonnectActivation = async () => {
+    if (!pendingPaymentMethod) return;
+    
+    setShowKonnectConfirm(false);
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      console.log(`Activating payment method ${pendingPaymentMethod.name}`);
+      
+      const response = await fetch(`http://localhost:3001/api/payment-methods/${pendingPaymentMethod.id}/toggle`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to toggle payment method status: ${response.status}`);
+      }
+
+      const updatedPaymentMethod = await response.json();
+      
+      // Update the payment methods list immediately
+      setPaymentMethods(prevMethods => 
+        prevMethods.map(pm => 
+          pm.id === pendingPaymentMethod.id 
+            ? { ...pm, isActive: updatedPaymentMethod.isActive }
+            : { ...pm, isActive: false } // Deactivate all others
+        )
+      );
+      
+      toast.success(`"${pendingPaymentMethod.name}" activated and all other payment methods deactivated!`);
+      
+    } catch (err) {
+      console.error('Toggle status error:', err);
+      toast.error(`Failed to toggle payment method status: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setPendingPaymentMethod(null);
+    }
+  };
+
+  const cancelKonnectActivation = () => {
+    setShowKonnectConfirm(false);
+    setPendingPaymentMethod(null);
+  };
+
+  const handleSetBaseCurrency = async (currency: any) => {
+    try {
+      setTogglingCurrencyId(currency.id);
+      setIsUpdatingCurrencies(true);
+      
+      const token = localStorage.getItem('authToken');
+      
+      // First, set this currency as base (this will also activate it)
+      const response = await fetch(`http://localhost:3001/api/settings/currencies/${currency.id}/set-base`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to set base currency: ${response.status}`);
+      }
+
+      const updatedCurrency = await response.json();
+      
+      // Update the currencies list immediately
+      setCurrencies(prevCurrencies => 
+        prevCurrencies.map(c => ({
+          ...c,
+          isBase: c.id === currency.id,
+          isActive: c.id === currency.id // Only the base currency is active
+        }))
+      );
+      
+      // Update the base currency context immediately
+      updateBaseCurrency(updatedCurrency.currency);
+      
+      // Force refresh all pages by updating localStorage and dispatching event
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('currentBaseCurrency', JSON.stringify(updatedCurrency.currency));
+        window.dispatchEvent(new CustomEvent('currencyChanged', { detail: updatedCurrency.currency }));
+        
+        // Also force a page refresh for all tabs/windows
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
+      
+      toast.success(`"${currency.name}" is now the base currency and active for the entire website!`);
+      setCurrencyUpdateSuccess(true);
+      
+    } catch (err) {
+      console.error('Set base currency error:', err);
+      toast.error(`Failed to set base currency: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setTogglingCurrencyId(null);
+      setIsUpdatingCurrencies(false);
+    }
+  };
+
   const handleToggleCurrencyStatus = async (currency: any) => {
     // Show confirmation dialog for important operations
     if (currency.isBase && currency.isActive) {
@@ -743,10 +849,19 @@ const AdminDashboard: React.FC = () => {
       const confirmed = window.confirm(message);
       if (!confirmed) return;
     } else if (!currency.isActive) {
-      const confirmed = window.confirm(
-        `Are you sure you want to activate the currency "${currency.name}"?\n\nThis currency will be available for use throughout the website.`
-      );
-      if (!confirmed) return;
+      // Check if we're trying to activate a currency when another is already active
+      const currentlyActive = currencies.find(c => c.isActive);
+      if (currentlyActive) {
+        const confirmed = window.confirm(
+          `Are you sure you want to activate "${currency.name}"?\n\nThis will deactivate "${currentlyActive.name}" and make "${currency.name}" the only active currency.`
+        );
+        if (!confirmed) return;
+      } else {
+        const confirmed = window.confirm(
+          `Are you sure you want to activate the currency "${currency.name}"?\n\nThis currency will be available for use throughout the website.`
+        );
+        if (!confirmed) return;
+      }
     } else {
       const confirmed = window.confirm(
         `Are you sure you want to deactivate the currency "${currency.name}"?\n\nThis currency will no longer be available for use throughout the website.`
@@ -776,13 +891,27 @@ const AdminDashboard: React.FC = () => {
       
       // Update the currency in the local state immediately (no refresh needed)
       setCurrencies(prevCurrencies => 
-        prevCurrencies.map(c => 
-          c.id === currency.id ? { ...c, isActive: updatedCurrency.isActive } : c
-        )
+        prevCurrencies.map(c => {
+          if (c.id === currency.id) {
+            return { ...c, isActive: updatedCurrency.isActive };
+          }
+          // If we're activating a currency, deactivate all others
+          if (updatedCurrency.isActive) {
+            return { ...c, isActive: false };
+          }
+          return c;
+        })
       );
       
       // If this currency is now active and was set as base, update the base currency context immediately
       if (updatedCurrency.isActive && updatedCurrency.isBase) {
+        // Ensure only one currency is base
+        setCurrencies(prevCurrencies => 
+          prevCurrencies.map(c => ({
+            ...c,
+            isBase: c.id === currency.id
+          }))
+        );
         updateBaseCurrency(updatedCurrency);
         toast.success(`Currency ${currency.name} activated and set as base currency!`);
         setCurrencyUpdateSuccess(true);
@@ -1049,10 +1178,6 @@ const AdminDashboard: React.FC = () => {
         }
       } else if (activeTab === 'currency') {
         // Currency management
-        console.log('=== Creating/Updating Currency ===');
-        console.log('Form data:', formData);
-        console.log('Modal type:', modalType);
-        
         const currencyData = {
           name: formData.name,
           code: formData.code,
@@ -1068,9 +1193,7 @@ const AdminDashboard: React.FC = () => {
           ? `http://localhost:3001/api/${endpoint}`
           : `http://localhost:3001/api/${endpoint}/${formData.id}`;
 
-        console.log('Request URL:', url);
-        console.log('Request method:', method);
-        console.log('Request payload:', JSON.stringify(currencyData, null, 2));
+
 
         const response = await fetch(url, {
           method,
@@ -1081,9 +1204,6 @@ const AdminDashboard: React.FC = () => {
           body: JSON.stringify(currencyData),
         });
 
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
-
         if (!response.ok) {
           const errorData = await response.text();
           console.error('Currency creation error response:', errorData);
@@ -1091,10 +1211,6 @@ const AdminDashboard: React.FC = () => {
         }
 
         updatedItem = await response.json();
-        console.log('Created/Updated currency:', updatedItem);
-        console.log('Currency name:', (updatedItem as any).currency?.name);
-        console.log('Currency code:', (updatedItem as any).currency?.code);
-        console.log('Full updatedItem:', JSON.stringify(updatedItem, null, 2));
 
                 // Handle base currency exclusivity - only one can be base
         if ((updatedItem as any).currency?.isBase) {
@@ -1243,13 +1359,6 @@ const AdminDashboard: React.FC = () => {
   
   ///render currencies
   const renderCurrencies = () => {
-    // Debug log to see the current state
-    console.log('renderCurrencies - Current state:', {
-      currencies: currencies,
-      activeCount: currencies?.filter(c => c.isActive)?.length || 0,
-      activeCurrencies: currencies?.filter(c => c.isActive) || []
-    });
-    
     return (
     <div className="space-y-6">
       <div className="bg-violet-50 rounded-2xl shadow-lg border border-violet-100/70 overflow-hidden">
@@ -1280,64 +1389,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Currency Summary */}
-        <div className={`px-6 py-4 border-b transition-colors duration-200 ${
-          isUpdatingCurrencies 
-            ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200/50' 
-            : currencyUpdateSuccess
-            ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200/50'
-            : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200/50'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <span className={`text-sm font-medium ${
-                  isUpdatingCurrencies ? 'text-yellow-900' : currencyUpdateSuccess ? 'text-green-900' : 'text-blue-900'
-                }`}>
-                  Active Currencies:
-                </span>
-                <span className={`text-sm px-2 py-1 rounded-full ${
-                  isUpdatingCurrencies 
-                    ? 'text-yellow-700 bg-yellow-100' 
-                    : currencyUpdateSuccess
-                    ? 'text-green-700 bg-green-100'
-                    : 'text-blue-700 bg-blue-100'
-                }`}>
-                  {currencies.filter(c => c.isActive).length}
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className={`text-sm font-medium ${
-                  isUpdatingCurrencies ? 'text-yellow-900' : currencyUpdateSuccess ? 'text-green-900' : 'text-blue-900'
-                }`}>
-                  Total Currencies:
-                </span>
-                <span className={`text-sm px-2 py-1 rounded-full ${
-                  isUpdatingCurrencies 
-                    ? 'text-yellow-700 bg-yellow-100' 
-                    : currencyUpdateSuccess
-                    ? 'text-green-700 bg-green-100'
-                    : 'text-blue-700 bg-blue-100'
-                }`}>
-                  {currencies.length}
-                </span>
-              </div>
-            </div>
-            <div className={`text-xs flex items-center space-x-2 ${
-              isUpdatingCurrencies ? 'text-yellow-600' : currencyUpdateSuccess ? 'text-green-600' : 'text-blue-600'
-            }`}>
-              {isUpdatingCurrencies && (
-                <div className="w-3 h-3 animate-spin rounded-full border-2 border-yellow-600 border-t-transparent"></div>
-              )}
-              {currencyUpdateSuccess && (
-                <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
-              {isUpdatingCurrencies ? 'Updating currencies...' : currencyUpdateSuccess ? 'Currency updated successfully!' : `Changes are applied immediately across the entire website${currencies.filter(c => c.isActive).length === 1 ? ' ⚠️ At least one currency must remain active' : ''}`}
-            </div>
-          </div>
-        </div>
+
 
         {/* Table */}
         <div className="overflow-x-auto">
@@ -1349,7 +1401,6 @@ const AdminDashboard: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exchange Rate</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -1381,7 +1432,14 @@ const AdminDashboard: React.FC = () => {
                           Base
                         </span>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <button
+                          onClick={() => handleSetBaseCurrency(currency)}
+                          disabled={togglingCurrencyId === currency.id}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 border border-gray-200 transition-colors cursor-pointer"
+                          title="Click to set as base currency and activate for the entire website"
+                        >
+                          Set as Base
+                        </button>
                       )}
                     </div>
                   </td>
@@ -1425,18 +1483,9 @@ const AdminDashboard: React.FC = () => {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          console.log('Currency toggle clicked:', {
-                            currencyId: currency.id,
-                            currencyName: currency.name,
-                            isActive: currency.isActive,
-                            isBase: currency.isBase,
-                            totalCurrencies: currencies.length,
-                            activeCurrencies: currencies.filter(c => c.isActive).length,
-                            canToggle: !(currency.isActive && currencies.filter(c => c.isActive).length === 1)
-                          });
-                          handleToggleCurrencyStatus(currency);
-                        }}
+                                              onClick={() => {
+                        handleToggleCurrencyStatus(currency);
+                      }}
                         disabled={togglingCurrencyId === currency.id || (currency.isActive && currencies.filter(c => c.isActive).length === 1)}
                         className={`p-1 rounded transition-colors ${
                           togglingCurrencyId === currency.id
@@ -2133,6 +2182,18 @@ const AdminDashboard: React.FC = () => {
             order={selectedOrder} 
             user={users.find(u => u.id === selectedOrder.userId) || { name: 'Unknown', email: 'unknown@example.com' } as User}
             onClose={() => setShowInvoiceModal(false)} 
+          />
+        )}
+
+        {/* Custom Konnect Confirmation Toast */}
+        {showKonnectConfirm && pendingPaymentMethod && (
+          <CustomToast
+            type="info"
+            title="Activation de Konnect"
+            message={`Voulez-vous activer "${pendingPaymentMethod.name}" et désactiver toutes les autres méthodes de paiement ?`}
+            onConfirm={confirmKonnectActivation}
+            onCancel={cancelKonnectActivation}
+            showActions={true}
           />
         )}
       </main>

@@ -6,6 +6,7 @@ import { LanguageProvider } from '../lib/languageContext';
 import { AuthProvider } from '../lib/authContext';
 import { TaxProvider } from '../lib/taxContext';
 import { LogoProvider } from './contexts/LogoContext';
+import { InvoiceSettingsProvider } from './contexts/InvoiceSettingsContext';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -15,7 +16,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <CurrencyProvider>
             <TaxProvider>
               <LogoProvider>
-                {children}
+                <InvoiceSettingsProvider>
+                  {children}
+                </InvoiceSettingsProvider>
               </LogoProvider>
             </TaxProvider>
           </CurrencyProvider>

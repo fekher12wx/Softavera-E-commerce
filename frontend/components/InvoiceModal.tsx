@@ -12,11 +12,13 @@ interface InvoiceSettings {
   companyAddress: string;
   companyCity: string;
   companyCountry: string;
+  companyPhone: string;
   paymentText: string;
   logoUrl: string;
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
+  fiscalInformation: string;
 }
 
 interface InvoiceModalProps {
@@ -40,11 +42,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, user, onClose }) => 
     companyAddress: '123 Business Street',
     companyCity: 'Tunis',
     companyCountry: 'Tunisia',
+    companyPhone: '+216 71 234 567',
     paymentText: 'Payment to E-Shop',
     logoUrl: '',
     primaryColor: '#8B5CF6',
     secondaryColor: '#EC4899',
-    accentColor: '#3B82F6'
+    accentColor: '#3B82F6',
+    fiscalInformation: ''
   });
 
   useEffect(() => {
@@ -247,9 +251,17 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, user, onClose }) => 
                 </div>
               </div>
               <div className="text-xs text-gray-600 space-y-0.5">
-                <div>{invoiceSettings.companyEmail}</div>
-                <div>{invoiceSettings.companyWebsite}</div>
                 <div>{invoiceSettings.companyAddress}, {invoiceSettings.companyCity}, {invoiceSettings.companyCountry}</div>
+                {invoiceSettings.companyEmail && (
+                  <div>{invoiceSettings.companyEmail}</div>
+                )}
+                {invoiceSettings.companyPhone && (
+                  <div>{invoiceSettings.companyPhone}</div>
+                )}
+                {invoiceSettings.companyWebsite && (
+                  <div>{invoiceSettings.companyWebsite}</div>
+                )}
+                
               </div>
             </div>
             <div className="text-right">
@@ -311,19 +323,62 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, user, onClose }) => 
             </div>
           </div>
 
-          {/* Footer with dynamic branding */}
-          <div className="pt-2 border-t text-xs text-gray-600">
-            <div className="text-center">
-              <div className="font-semibold">{invoiceSettings.paymentText}</div>
-              <div>Secure online payment</div>
-            </div>
-          </div>
+          {/* Footer with company information */}
+          <div className="pt-4 border-t border-gray-200">
+            {/* Company Information Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+              {/* Left side - Company Details */}
+              <div className="text-xs text-gray-600">
+                <h4 className="font-semibold text-gray-800 mb-2" style={{ color: invoiceSettings.primaryColor }}>
+                  {invoiceSettings.companyName}
+                </h4>
+                <div className="space-y-1">
+                  {invoiceSettings.companyAddress && (
+                    <div>{invoiceSettings.companyAddress}</div>
+                  )}
+                  {(invoiceSettings.companyCity || invoiceSettings.companyCountry) && (
+                    <div>
+                      {invoiceSettings.companyCity && `${invoiceSettings.companyCity}`}
+                      {invoiceSettings.companyCity && invoiceSettings.companyCountry && ', '}
+                      {invoiceSettings.companyCountry}
+                    </div>
+                  )}
 
-          <div 
-            className="text-center mt-2 text-xs font-semibold"
-            style={getPrimaryColorStyle()}
-          >
-            {t('thank_you')}
+                </div>
+              </div>
+
+              {/* Right side - Fiscal Information */}
+              <div className="text-xs text-gray-600 text-right">
+                <h4 className="font-semibold text-gray-800 mb-2" style={{ color: invoiceSettings.primaryColor }}>
+                  Informations Fiscales
+                </h4>
+                <div className="space-y-1">
+                                  {invoiceSettings.fiscalInformation && (
+                  <div>
+                    {invoiceSettings.fiscalInformation.split('\n').map((line, index) => (
+                      <div key={index}>{line}</div>
+                    ))}
+                  </div>
+                )}
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Information */}
+            <div className="text-center border-t border-gray-200 pt-3 mb-3">
+              <div className="text-xs text-gray-600">
+                <div className="font-semibold text-gray-800 mb-1">{invoiceSettings.paymentText}</div>
+                <div className="text-gray-500">Paiement sécurisé en ligne</div>
+              </div>
+            </div>
+
+            {/* Thank You Message */}
+            <div 
+              className="text-center text-xs font-semibold"
+              style={{ color: invoiceSettings.primaryColor }}
+            >
+              {t('thank_you')}
+            </div>
           </div>
         </div>
 

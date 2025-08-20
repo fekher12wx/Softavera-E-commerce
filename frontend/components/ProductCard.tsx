@@ -16,10 +16,12 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart } = useCart();
-  const { convertPrice, getCurrencySymbol } = useCurrency();
+  const { convertPrice, getCurrencySymbol, baseCurrency } = useCurrency();
   const { t } = useLanguage();
   const { getTaxById, calculateTax } = useTax();
   const { user } = useAuth();
+  
+
   const [quantity, setQuantity] = useState(1);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showToast, setShowToast] = useState(false);

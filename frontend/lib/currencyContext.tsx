@@ -17,8 +17,9 @@ export interface BaseCurrency {
 interface CurrencyContextType {
   baseCurrency: BaseCurrency | null;
   setBaseCurrency: (currency: BaseCurrency | null) => void;
-  refreshBaseCurrency: () => Promise<void>;
   updateBaseCurrency: (currency: BaseCurrency) => void;
+  refreshBaseCurrency: () => Promise<void>;
+  forceUpdate: () => void;
   loading: boolean;
   error: string | null;
   convertPrice: (price: number, fromCurrency?: BaseCurrency) => number;
@@ -46,7 +47,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
 
-      const response = await fetch('http://localhost:3001/api/settings/currencies/base', {
+      const response = await fetch('http://localhost:3001/api/settings/base-currency', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -84,10 +85,60 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
   const updateBaseCurrency = (currency: BaseCurrency) => {
     setBaseCurrency(currency);
     setError(null);
+    
+    // Force refresh all components by updating localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('currentBaseCurrency', JSON.stringify(currency));
+      // Dispatch a custom event to notify all components
+      window.dispatchEvent(new CustomEvent('currencyChanged', { detail: currency }));
+    }
+  };
+
+  const forceUpdate = () => {
+    setBaseCurrency(prev => prev ? { ...prev } : null);
   };
 
   useEffect(() => {
     fetchBaseCurrency();
+    
+    // Listen for currency changes from other parts of the app
+    const handleCurrencyChange = (event: CustomEvent) => {
+      setBaseCurrency(event.detail);
+      setError(null);
+    };
+    
+    // Listen for localStorage changes
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'currentBaseCurrency' && e.newValue) {
+        try {
+          const newCurrency = JSON.parse(e.newValue);
+          setBaseCurrency(newCurrency);
+          setError(null);
+        } catch (error) {
+          console.error('Error parsing currency from localStorage:', error);
+        }
+      }
+    };
+    
+    window.addEventListener('currencyChanged', handleCurrencyChange as EventListener);
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Check if there's a currency in localStorage
+    const storedCurrency = localStorage.getItem('currentBaseCurrency');
+    if (storedCurrency) {
+      try {
+        const parsedCurrency = JSON.parse(storedCurrency);
+        setBaseCurrency(parsedCurrency);
+        setError(null);
+      } catch (error) {
+        console.error('Error parsing stored currency:', error);
+      }
+    }
+    
+    return () => {
+      window.removeEventListener('currencyChanged', handleCurrencyChange as EventListener);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const convertPrice = (price: number, fromCurrency?: BaseCurrency): number => {
@@ -109,6 +160,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
       setBaseCurrency,
       refreshBaseCurrency,
       updateBaseCurrency,
+      forceUpdate,
       loading,
       error,
       convertPrice,
