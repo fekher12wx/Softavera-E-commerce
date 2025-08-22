@@ -89,7 +89,10 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, user, onClose }) => 
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('fr-FR', {
+    if (!date) return 'N/A';
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) return 'N/A';
+    return dateObj.toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: '2-digit', 
       year: '2-digit'
@@ -295,9 +298,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, user, onClose }) => 
                   } : {}}
                 >
                   <td className="py-1 px-2 text-xs">{item.product?.name || 'Product'}</td>
-                  <td className="text-center py-1 px-2 text-xs">{symbol}{convertPrice(item.product?.price).toFixed(2)}</td>
+                  <td className="text-center py-1 px-2 text-xs">{symbol}{convertPrice(item.product?.price).toFixed(3)}</td>
                   <td className="text-center py-1 px-2 text-xs">{item.quantity.toString().padStart(2, '0')}</td>
-                  <td className="text-right py-1 px-2 text-xs font-medium">{symbol}{convertPrice(item.product?.price * item.quantity).toFixed(2)}</td>
+                  <td className="text-right py-1 px-2 text-xs font-medium">{symbol}{convertPrice(item.product?.price * item.quantity).toFixed(3)}</td>
                 </tr>
               ))}
             </tbody>
@@ -308,17 +311,17 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, user, onClose }) => 
             <div className="w-40">
               <div className="flex justify-between py-0.5 border-b text-xs">
                 <span>{t('subtotal')}:</span>
-                <span>{symbol} {subtotal.toFixed(2)}</span>
+                <span>{symbol} {subtotal.toFixed(3)}</span>
               </div>
               <div className="flex justify-between py-0.5 border-b text-xs">
                 <span>{t('tax')}:</span>
-                <span>{symbol} {totalTax.toFixed(2)}</span>
+                <span>{symbol} {totalTax.toFixed(3)}</span>
               </div>
               <div 
                 className="text-white text-center py-1 mt-1 rounded text-xs"
                 style={getGradientStyle()}
               >
-                <span className="font-medium">{t('total')}: {symbol}{total.toFixed(2)}</span>
+                <span className="font-medium">{t('total')}: {symbol}{total.toFixed(3)}</span>
               </div>
             </div>
           </div>

@@ -110,7 +110,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({ products, searchTerm, han
                     <td className="py-5 px-6">
                       <div className="flex items-center space-x-2">
                         <span className="text-lg font-bold text-gray-900">
-                          {getCurrencySymbol()}{product.price?.toFixed(2)}
+                          {getCurrencySymbol()}{product.price?.toFixed(3)}
                         </span>
                       </div>
                     </td>

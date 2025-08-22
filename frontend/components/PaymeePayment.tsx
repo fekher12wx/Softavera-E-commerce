@@ -65,6 +65,10 @@ const PaymeePayment: React.FC<PaymeePaymentProps> = ({
 
       const result = await response.json();
 
+      console.log('🔍 Frontend received response:', result);
+      console.log('🔍 Response success:', result.success);
+      console.log('🔍 Response data:', result.data);
+
       if (result.success) {
         setPaymentToken(result.data.token);
         setPaymentUrl(result.data.payment_url);
@@ -241,7 +245,7 @@ const PaymeePayment: React.FC<PaymeePaymentProps> = ({
         <div className="bg-gray-50 rounded-xl p-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-gray-600">{t('amount')}:</span>
-            <span className="font-bold text-gray-800">{amount.toFixed(2)} TND</span>
+            <span className="font-bold text-gray-800">{amount.toFixed(3)} TND</span>
           </div>
           <div className="flex justify-between items-center mb-2">
             <span className="text-gray-600">{t('customer')}:</span>

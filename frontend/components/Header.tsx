@@ -38,7 +38,7 @@ type RegForm = {
 };
 
 const Header: React.FC = () => {
-  const { itemCount } = useCart();
+  const { itemCount, clearCart } = useCart();
   const { t } = useLanguage();
   const { currentLogo } = useLogo(); // Use global logo context
   const { settings: invoiceSettings } = useInvoiceSettings(); // Use invoice settings context
@@ -203,6 +203,7 @@ const Header: React.FC = () => {
     localStorage.removeItem('user');
     setUser(null);
     setShowUserMenu(false);
+    clearCart(); // Clear the cart when logging out
     toast.success(t('logout_success'));
     setTimeout(() => {
       window.location.reload();

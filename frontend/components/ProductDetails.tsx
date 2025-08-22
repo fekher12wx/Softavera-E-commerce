@@ -77,7 +77,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
             <div className="flex-1 space-y-6">
               <h1 className="text-4xl font-bold text-gray-800 leading-tight">{product.name}</h1>
               <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                {convertPrice(product.price).toFixed(2)} {getCurrencySymbol()}
+                {convertPrice(product.price).toFixed(3)} {getCurrencySymbol()}
               </div>
               <div className="text-gray-600 text-lg">{product.description}</div>
               <div>

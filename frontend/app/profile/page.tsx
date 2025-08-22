@@ -405,7 +405,7 @@ const ProfilePage = () => {
                           </p>
                         </div>
                         <div className="text-right flex flex-col gap-2 items-end">
-                          <p className="font-bold text-xl text-gray-900 mb-3">{currencySymbol}{convertPrice(order.total).toFixed(2)}</p>
+                          <p className="font-bold text-xl text-gray-900 mb-3">{currencySymbol}{convertPrice(order.total).toFixed(3)}</p>
                           {canCancelOrder(order) && (
                             <button
                               onClick={() => handleCancelOrder(order.id)}

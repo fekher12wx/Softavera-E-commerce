@@ -6,6 +6,12 @@ import { useLanguage } from '../../lib/languageContext';
 const StatsCards = ({ users, products, orders, totalRevenue }: any) => {
   const { t } = useLanguage();
   
+  // Ensure arrays are always arrays to prevent runtime errors
+  const safeUsers = Array.isArray(users) ? users : [];
+  const safeProducts = Array.isArray(products) ? products : [];
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const safeTotalRevenue = typeof totalRevenue === 'number' ? totalRevenue : 0;
+  
   return (
     <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
       <div className="rounded-2xl p-5 shadow-md border hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-blue-500 to-blue-400 border-blue-500">
@@ -14,7 +20,7 @@ const StatsCards = ({ users, products, orders, totalRevenue }: any) => {
             <Users className="w-6 h-6 text-white" />
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-white">{users.length}</p>
+            <p className="text-3xl font-bold text-white">{safeUsers.length}</p>
             <p className="text-xs text-white/80 mt-1">{t('total_users')}</p>
           </div>
         </div>
@@ -25,7 +31,7 @@ const StatsCards = ({ users, products, orders, totalRevenue }: any) => {
             <Package className="w-6 h-6 text-white" />
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-white">{products.length}</p>
+            <p className="text-3xl font-bold text-white">{safeProducts.length}</p>
             <p className="text-xs text-white/80 mt-1">{t('total_products')}</p>
           </div>
         </div>
@@ -36,7 +42,7 @@ const StatsCards = ({ users, products, orders, totalRevenue }: any) => {
             <ShoppingCart className="w-6 h-6 text-white" />
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-white">{orders.length}</p>
+            <p className="text-3xl font-bold text-white">{safeOrders.length}</p>
             <p className="text-xs text-white/80 mt-1">{t('total_orders')}</p>
           </div>
         </div>
@@ -47,7 +53,9 @@ const StatsCards = ({ users, products, orders, totalRevenue }: any) => {
             <DollarSign className="w-6 h-6 text-white" />
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-white">{totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + CURRENCY_SYMBOL}</p>
+            <p className="text-3xl font-bold text-white">
+              {safeTotalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + CURRENCY_SYMBOL}
+            </p>
             <p className="text-xs text-white/80 mt-1">{t('total_revenue')}</p>
           </div>
         </div>

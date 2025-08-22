@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { User, Product, Order, Tax, PaymentMethod, Currency, TabType, ModalType } from './adminTypes';
+import { User, Product, Order, Tax, PaymentMethod, Currency, TabType, ModalType, SettingsSubTab } from './adminTypes';
 import { getCategories, CategoryType } from '../../lib/categories';
 import { getCountries } from '../../lib/countries';
 import { useCurrency } from '../../lib/currencyContext';
@@ -102,6 +102,7 @@ interface ModalProps {
   selectedItem: User | Product | Order | Tax | PaymentMethod | Currency | null;
   handleSave: (formData: any) => Promise<void>;
   activeTab: TabType;
+  activeSettingsSubTab?: SettingsSubTab;
   users: User[];
   products: Product[];
   orders: Order[];
@@ -118,6 +119,7 @@ function Modal({
   selectedItem,
   handleSave,
   activeTab,
+  activeSettingsSubTab,
   users,
   products,
   orders,
@@ -155,38 +157,40 @@ function Modal({
         image: item?.image || '',
         ...item
       };
-    } else if (activeTab === 'taxes') {
-      // Initialize tax fields with proper defaults
-      return {
-        rate: item?.rate !== undefined ? item.rate : 0,
-        isActive: item?.isActive !== undefined ? item.isActive : true,
-        ...item
-      };
-    } else if (activeTab === 'paymentMethods') {
-      // Initialize payment method fields with proper defaults
-      return {
-        name: item?.name || '',
-        code: item?.code || '',
-        description: item?.description || '',
-        isActive: item?.isActive !== undefined ? item.isActive : true,
-        config: item?.config || {
-          apiKey: '',
-          merchantId: '',
-          environment: 'test'
-        },
-        ...item
-      };
-    } else if (activeTab === 'currency') {
-      // Initialize currency fields with proper defaults
-      return {
-        name: item?.name || '',
-        code: item?.code || '',
-        symbol: item?.symbol || '',
-        isActive: item?.isActive !== undefined ? item.isActive : true,
-        exchangeRate: item?.exchangeRate || 1,
-        isBase: item?.isBase || false,
-        ...item
-      };
+    } else if (activeTab === 'settings') {
+      if (activeSettingsSubTab === 'taxes') {
+        // Initialize tax fields with proper defaults
+        return {
+          rate: item?.rate !== undefined ? item.rate : 0,
+          isActive: item?.isActive !== undefined ? item.isActive : true,
+          ...item
+        };
+      } else if (activeSettingsSubTab === 'paymentMethods') {
+        // Initialize payment method fields with proper defaults
+        return {
+          name: item?.name || '',
+          code: item?.code || '',
+          description: item?.description || '',
+          isActive: item?.isActive !== undefined ? item.isActive : true,
+          config: item?.config || {
+            apiKey: '',
+            merchantId: '',
+            environment: 'test'
+          },
+          ...item
+        };
+      } else if (activeSettingsSubTab === 'currencies') {
+        // Initialize currency fields with proper defaults
+        return {
+          name: item?.name || '',
+          code: item?.code || '',
+          symbol: item?.symbol || '',
+          isActive: item?.isActive !== undefined ? item.isActive : true,
+          exchangeRate: item?.exchangeRate || 1,
+          isBase: item?.isBase || false,
+          ...item
+        };
+      }
     }
     return item || {};
   }, [activeTab]);
@@ -1130,7 +1134,7 @@ function Modal({
             </div>
             <div className="text-right space-y-2">
               <StatusBadge status={formData.status} />
-              <div className="text-2xl font-bold text-white">{getCurrencySymbol()}{formData.total?.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-white">{getCurrencySymbol()}{formData.total?.toFixed(3)}</div>
             </div>
           </div>
         </div>
@@ -1175,8 +1179,8 @@ function Modal({
                     <tr key={idx} className="border-b border-gray-100 hover:bg-violet-50/30 transition-colors">
                       <td className="py-4 px-4 font-medium text-gray-900">{item.product?.name || 'Unknown'}</td>
                       <td className="text-center py-4 px-4 text-gray-600">{item.quantity}</td>
-                      <td className="text-right py-4 px-4 text-gray-600">{getCurrencySymbol()}{item.product?.price?.toFixed(2)}</td>
-                      <td className="text-right py-4 px-4 font-bold text-gray-900">{getCurrencySymbol()}{(item.product?.price * item.quantity).toFixed(2)}</td>
+                      <td className="text-right py-4 px-4 text-gray-600">{getCurrencySymbol()}{item.product?.price?.toFixed(3)}</td>
+                      <td className="text-right py-4 px-4 font-bold text-gray-900">{getCurrencySymbol()}{(item.product?.price * item.quantity).toFixed(3)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1189,7 +1193,7 @@ function Modal({
             <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white rounded-xl p-6 shadow-xl">
               <div className="text-center">
                 <div className="text-sm font-semibold opacity-90 mb-1">TOTAL AMOUNT</div>
-                <div className="text-3xl font-bold">{getCurrencySymbol()}{formData.total?.toFixed(2)}</div>
+                <div className="text-3xl font-bold">{getCurrencySymbol()}{formData.total?.toFixed(3)}</div>
               </div>
             </div>
           </div>
@@ -1244,9 +1248,9 @@ function Modal({
           {modalType === 'add-tax' && renderCreateTaxFields()}
           {modalType !== 'add-tax' && activeTab === 'users' && renderUserFields()}
           {modalType !== 'add-tax' && activeTab === 'products' && renderProductFields()}
-          {modalType !== 'add-tax' && activeTab === 'taxes' && renderTaxFields()}
-          {modalType !== 'add-tax' && activeTab === 'paymentMethods' && renderPaymentMethodFields()}
-          {modalType !== 'add-tax' && activeTab === 'currency' && renderCurrencyFields()}
+                  {modalType !== 'add-tax' && activeTab === 'settings' && activeSettingsSubTab === 'taxes' && renderTaxFields()}
+        {modalType !== 'add-tax' && activeTab === 'settings' && activeSettingsSubTab === 'paymentMethods' && renderPaymentMethodFields()}
+        {modalType !== 'add-tax' && activeTab === 'settings' && activeSettingsSubTab === 'currencies' && renderCurrencyFields()}
           {modalType !== 'add-tax' && activeTab === 'orders' && isViewMode && renderOrderInvoice()}
           {modalType !== 'add-tax' && activeTab === 'orders' && !isViewMode && (
             <div className="p-6">

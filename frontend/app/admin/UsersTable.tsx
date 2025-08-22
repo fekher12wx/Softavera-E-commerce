@@ -43,12 +43,12 @@ const UsersTable: React.FC<UsersTableProps> = ({ users, searchTerm, handleView, 
   
   return (
     <div className="space-y-6">
-      <div className="bg-violet-50 rounded-2xl shadow-lg border border-violet-100/70 overflow-hidden">
+      <div className="bg-emerald-50 rounded-2xl shadow-lg border border-emerald-100/70 overflow-hidden">
         {/* Table Header */}
         <div className="bg-gradient-to-r from-slate-50 to-gray-50 px-6 py-4 border-b border-gray-200/70">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                 </svg>
@@ -93,7 +93,7 @@ const UsersTable: React.FC<UsersTableProps> = ({ users, searchTerm, handleView, 
                 .map((user, index) => (
                   <tr
                     key={user.id || index}
-                    className="group hover:bg-gradient-to-r hover:from-indigo-50/30 hover:to-purple-50/30 transition-all duration-200"
+                    className="group hover:bg-gradient-to-r hover:from-emerald-50/30 hover:to-teal-50/30 transition-all duration-200"
                   >
                     {/* User Information */}
                     <td className="py-5 px-6">

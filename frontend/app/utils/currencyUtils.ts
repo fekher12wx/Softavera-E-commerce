@@ -30,7 +30,7 @@ export const convertCurrency = (
  * @returns Formatted price string
  */
 export const formatPrice = (price: number, currency: BaseCurrency): string => {
-  return `${currency.symbol}${price.toFixed(2)}`;
+  return `${currency.symbol}${price.toFixed(3)}`;
 };
 
 /**
@@ -40,7 +40,7 @@ export const formatPrice = (price: number, currency: BaseCurrency): string => {
  * @returns Formatted price string
  */
 export const formatPriceWithCode = (price: number, currency: BaseCurrency): string => {
-  return `${price.toFixed(2)} ${currency.code}`;
+  return `${price.toFixed(3)} ${currency.code}`;
 };
 
 /**

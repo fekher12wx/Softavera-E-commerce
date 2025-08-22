@@ -182,7 +182,7 @@ const KonnectPayment: React.FC<KonnectPaymentProps> = ({
         <div className="bg-gray-50 rounded-xl p-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-gray-600">{t('amount')}:</span>
-            <span className="font-bold text-gray-800">{amount.toFixed(2)}</span>
+            <span className="font-bold text-gray-800">{amount.toFixed(3)}</span>
           </div>
           <div className="flex justify-between items-center mb-2">
             <span className="text-gray-600">{t('customer')}:</span>

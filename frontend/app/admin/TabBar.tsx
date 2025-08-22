@@ -2,7 +2,7 @@ import React from 'react';
 import { Users, Package, ShoppingCart, Plus, DollarSign, Percent, CreditCard, Settings, Coins, ChevronDown } from 'lucide-react';
 
 // Mock types for demonstration
-type TabType = 'users' | 'products' | 'orders' | 'taxes' | 'paymentMethods' | 'currency' | 'invoiceSettings';
+type TabType = 'users' | 'products' | 'orders' | 'settings';
 
 interface TabBarProps {
   activeTab: TabType;
@@ -10,9 +10,6 @@ interface TabBarProps {
   users?: any[];
   products?: any[];
   orders?: any[];
-  taxes?: any[];
-  paymentMethods?: any[];
-  currencies?: any[];
   onAddNew: () => void;
 }
 
@@ -22,20 +19,17 @@ const TabBar = ({
   users = [], 
   products = [], 
   orders = [], 
-  taxes = [], 
-  paymentMethods = [], 
-  currencies = [], 
   onAddNew 
 }: TabBarProps) => {
   
-  const tabs: TabType[] = ['users', 'products', 'orders', 'taxes', 'paymentMethods', 'currency', 'invoiceSettings'];
+  const tabs: TabType[] = ['users', 'products', 'orders', 'settings'];
 
   const getTabConfig = (tab: TabType) => {
     const configs = {
       users: { 
         label: 'Users', 
         icon: Users, 
-        count: users.length, 
+        count: Array.isArray(users) ? users.length : 0, 
         color: 'from-blue-500 to-cyan-500',
         lightColor: 'from-blue-50 to-cyan-50',
         textColor: 'text-blue-600'
@@ -43,7 +37,7 @@ const TabBar = ({
       products: { 
         label: 'Products', 
         icon: Package, 
-        count: products.length,
+        count: Array.isArray(products) ? products.length : 0,
         color: 'from-green-500 to-emerald-500',
         lightColor: 'from-green-50 to-emerald-50',
         textColor: 'text-green-600'
@@ -51,36 +45,13 @@ const TabBar = ({
       orders: { 
         label: 'Orders', 
         icon: ShoppingCart, 
-        count: orders.length,
+        count: Array.isArray(orders) ? orders.length : 0,
         color: 'from-orange-500 to-amber-500',
         lightColor: 'from-orange-50 to-amber-50',
         textColor: 'text-orange-600'
       },
-      taxes: { 
-        label: 'Taxes', 
-        icon: Percent, 
-        count: taxes.length,
-        color: 'from-red-500 to-rose-500',
-        lightColor: 'from-red-50 to-rose-50',
-        textColor: 'text-red-600'
-      },
-      paymentMethods: { 
-        label: 'Payment Methods', 
-        icon: CreditCard, 
-        count: paymentMethods.length,
-        color: 'from-purple-500 to-violet-500',
-        lightColor: 'from-purple-50 to-violet-50',
-        textColor: 'text-purple-600'
-      },
-      currency: { 
-        label: 'Currencies', 
-        icon: Coins, 
-        count: currencies.length,
-        color: 'from-yellow-500 to-orange-500',
-        lightColor: 'from-yellow-50 to-orange-50',
-        textColor: 'text-yellow-600'
-      },
-      invoiceSettings: { 
+
+      settings: { 
         label: 'Settings', 
         icon: Settings, 
         count: undefined,
@@ -135,8 +106,8 @@ const TabBar = ({
         })}
       </div>
       
-      {/* Compact Add Button - Hidden for Invoice Settings */}
-      {activeTab !== 'invoiceSettings' && (
+      {/* Compact Add Button - Hidden for Settings */}
+      {activeTab !== 'settings' && (
         <button
           onClick={onAddNew}
           className="group relative overflow-hidden px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"

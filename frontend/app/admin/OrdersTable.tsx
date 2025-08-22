@@ -18,12 +18,12 @@ const OrdersTable: React.FC<OrdersTableProps> = ({ orders, users, searchTerm, ha
   
   return (
   <div className="space-y-6">
-    <div className="bg-blue-50 rounded-2xl shadow-lg border border-blue-100/70 overflow-hidden">
+    <div className="bg-emerald-50 rounded-2xl shadow-lg border border-emerald-100/70 overflow-hidden">
       {/* Table Header */}
       <div className="bg-gradient-to-r from-slate-50 to-gray-50 px-6 py-4 border-b border-gray-200/70">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
@@ -66,14 +66,18 @@ const OrdersTable: React.FC<OrdersTableProps> = ({ orders, users, searchTerm, ha
               })
               .map((order, index) => {
                 const orderIdDisplay = order?.id ? order.id.slice(-6).toUpperCase() : '------';
-                const createdAtDisplay = order?.createdAt ? new Date(order.createdAt).toLocaleString() : t('unknown_date');
+                const createdAtDisplay = (() => {
+                  if (!order?.createdAt) return t('unknown_date');
+                  const date = new Date(order.createdAt);
+                  return isNaN(date.getTime()) ? t('unknown_date') : date.toLocaleString();
+                })();
                 const totalDisplay = typeof order?.total === 'number' ? order.total : 'N/A';
                 const statusDisplay = order?.status ? (order.status.charAt(0).toUpperCase() + order.status.slice(1)) : t('unknown');
                 const statusClass =
                   order?.status === 'pending'
                     ? 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-700 border-yellow-200'
                     : order?.status === 'processing'
-                    ? 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border-blue-200'
+                    ? 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 border-emerald-200'
                     : order?.status === 'shipped'
                     ? 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-200'
                     : order?.status === 'delivered'
@@ -83,7 +87,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({ orders, users, searchTerm, ha
                 return (
                   <tr
                     key={order?.id || index}
-                    className="group hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-indigo-50/30 transition-all duration-200"
+                    className="group hover:bg-gradient-to-r hover:from-emerald-50/30 hover:to-teal-50/30 transition-all duration-200"
                   >
                     {/* Order Details */}
                     <td className="py-5 px-6">

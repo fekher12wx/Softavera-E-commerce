@@ -156,7 +156,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         <span className={`font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent ${
           size === 'large' ? 'text-4xl' : 'text-2xl'
         }`}>
-          {basePrice.toFixed(2)} {getCurrencySymbol()}
+          {basePrice.toFixed(3)} {getCurrencySymbol()}
         </span>
         {taxRate > 0 && (
           <span className={`text-gray-500 ${size === 'large' ? 'text-sm' : 'text-xs'}`}>
@@ -167,7 +167,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       {taxRate > 0 && (
         <div className={`text-gray-600 ${size === 'large' ? 'text-base' : 'text-sm'}`}>
           <span className="font-medium">
-            {t('total')}: {totalWithTax.toFixed(2)} {getCurrencySymbol()}
+            {t('total')}: {totalWithTax.toFixed(3)} {getCurrencySymbol()}
           </span>
         </div>
       )}
@@ -377,7 +377,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                     {taxRate > 0 && taxAmount > 0 && (
                       <div className="mt-3 pt-3 border-t border-purple-200/50">
                         <div className="text-sm text-gray-600">
-                          Tax amount: {taxAmount.toFixed(2)} {getCurrencySymbol()}
+                          Tax amount: {taxAmount.toFixed(3)} {getCurrencySymbol()}
                         </div>
                       </div>
                     )}

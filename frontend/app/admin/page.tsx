@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Edit, Eye, Trash2, Users, Package, ShoppingCart, DollarSign, Search, Bell } from 'lucide-react';
-import { User, Product, Order, Tax, PaymentMethod, Currency, TabType, ModalType } from './adminTypes';
+import { User, Product, Order, Tax, PaymentMethod, Currency, TabType, ModalType, SettingsSubTab } from './adminTypes';
 import StatsCard from './StatsCard';
 import UsersTable from './UsersTable';
 import ProductsTable from './ProductsTable';
@@ -21,6 +21,7 @@ import AdminHeader from './AdminHeader';
 import NotificationDropdown from './NotificationDropdown';
 import StatsCards from './StatsCards';
 import TabBar from './TabBar';
+import SettingsTabBar from './SettingsTabBar';
 import { useLogo } from '../contexts/LogoContext';
 import CustomToast from '../../components/CustomToast';
 
@@ -32,6 +33,7 @@ const AdminDashboard: React.FC = () => {
   const { t } = useLanguage();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('users');
+  const [activeSettingsSubTab, setActiveSettingsSubTab] = useState<SettingsSubTab>('paymentMethods');
   const [users, setUsers] = useState<User[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -413,7 +415,7 @@ const AdminDashboard: React.FC = () => {
         setError(`Cannot delete user: User with ID ${id} not found in backend`);
         return;
       }
-    } else if (activeTab === 'currency') {
+    } else if (activeTab === 'settings' && activeSettingsSubTab === 'currencies') {
       // For currencies, just check if ID is valid UUID format
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(id)) {
@@ -450,9 +452,10 @@ const AdminDashboard: React.FC = () => {
       const endpoint = activeTab === 'users' ? 'users' : 
                       activeTab === 'products' ? 'products' : 
                       activeTab === 'orders' ? 'orders' : 
-                      activeTab === 'taxes' ? 'taxes' : 
-                      activeTab === 'paymentMethods' ? 'payment-methods' : 
-                      activeTab === 'currency' ? 'settings/currencies' : 'users';
+                      activeTab === 'settings' ? 
+                        (activeSettingsSubTab === 'taxes' ? 'taxes' :
+                         activeSettingsSubTab === 'paymentMethods' ? 'payment-methods' :
+                         activeSettingsSubTab === 'currencies' ? 'currencies' : 'users') : 'users';
       
     
       
@@ -486,7 +489,7 @@ const AdminDashboard: React.FC = () => {
             if (activeTab === 'users') {
               setUsers(users.filter(user => user.id !== id));
               toast.success('User removed from list (was already deleted)');
-            } else if (activeTab === 'currency') {
+            } else if (activeTab === 'settings' && activeSettingsSubTab === 'currencies') {
               setCurrencies(currencies.filter(currency => currency.id !== id));
               toast.success('Currency removed from list (was already deleted)');
             }
@@ -547,15 +550,17 @@ const AdminDashboard: React.FC = () => {
       } else if (activeTab === 'orders') {
         setOrders(orders.filter(order => order.id !== id));
         toast.success('Order deleted successfully!');
-      } else if (activeTab === 'taxes') {
-        setTaxes(taxes.filter(tax => tax.id !== id));
-        toast.success('Tax deleted successfully!');
-      } else if (activeTab === 'paymentMethods') {
-        setPaymentMethods(paymentMethods.filter(pm => pm.id !== id));
-        toast.success('Payment method deleted successfully!');
-      } else if (activeTab === 'currency') {
-        setCurrencies(currencies.filter(currency => currency.id !== id));
-        toast.success('Currency deleted successfully!');
+      } else if (activeTab === 'settings') {
+        if (activeSettingsSubTab === 'taxes') {
+          setTaxes(taxes.filter(tax => tax.id !== id));
+          toast.success('Tax deleted successfully!');
+        } else if (activeSettingsSubTab === 'paymentMethods') {
+          setPaymentMethods(paymentMethods.filter(pm => pm.id !== id));
+          toast.success('Payment method deleted successfully!');
+        } else if (activeSettingsSubTab === 'currencies') {
+          setCurrencies(currencies.filter(currency => currency.id !== id));
+          toast.success('Currency deleted successfully!');
+        }
       }
       
     } catch (err) {
@@ -1051,7 +1056,7 @@ const AdminDashboard: React.FC = () => {
           toast.success(`Product "${(updatedItem as Product).name || 'Product'}" updated successfully!`);
         }
   
-      } else if (activeTab === 'taxes' || modalType === 'add-tax') {
+      } else if ((activeTab === 'settings' && activeSettingsSubTab === 'taxes') || modalType === 'add-tax') {
         // Tax management
         
         // Prepare tax data - only send rate and isActive
@@ -1114,7 +1119,7 @@ const AdminDashboard: React.FC = () => {
             // Silent error handling
           }
         }
-      } else if (activeTab === 'paymentMethods') {
+      } else if (activeTab === 'settings' && activeSettingsSubTab === 'paymentMethods') {
         // Payment Method management
         
         const paymentMethodData = {
@@ -1176,7 +1181,7 @@ const AdminDashboard: React.FC = () => {
           setPaymentMethods(paymentMethods.map(pm => pm.id === updatedItem.id ? updatedItem as PaymentMethod : pm));
           toast.success(`Payment method "${(updatedItem as PaymentMethod).name}" updated successfully!`);
         }
-      } else if (activeTab === 'currency') {
+      } else if (activeTab === 'settings' && activeSettingsSubTab === 'currencies') {
         // Currency management
         const currencyData = {
           name: formData.name,
@@ -1360,34 +1365,29 @@ const AdminDashboard: React.FC = () => {
   ///render currencies
   const renderCurrencies = () => {
     return (
-    <div className="space-y-6">
-      <div className="bg-violet-50 rounded-2xl shadow-lg border border-violet-100/70 overflow-hidden">
-        {/* Table Header */}
-        <div className="bg-gradient-to-r from-slate-50 to-gray-50 px-6 py-4 border-b border-gray-200/70">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Currencies</h2>
-                <p className="text-sm text-gray-600">
-                  Manage your store currencies and exchange rates
-                  {currencies.find(c => c.isBase) && (
-                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                      </svg>
-                      Base: {currencies.find(c => c.isBase)?.code}
-                    </span>
-                  )}
-                </p>
-              </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-indigo-600 via-purple-500 to-pink-400 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-white">Currencies</h1>
+              <p className="text-indigo-100 mt-1">Manage your store currencies and exchange rates</p>
             </div>
+            {currencies.find(c => c.isBase) && (
+              <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm text-white border border-white/30">
+                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                </svg>
+                Base: {currencies.find(c => c.isBase)?.code}
+              </span>
+            )}
           </div>
         </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-violet-50 rounded-2xl shadow-lg border border-violet-100/70 overflow-hidden">
 
 
 
@@ -1540,6 +1540,7 @@ const AdminDashboard: React.FC = () => {
             <p className="text-gray-500 max-w-sm mx-auto">Add your first currency to get started.</p>
           </div>
         )}
+        </div>
       </div>
     </div>
     );
@@ -2012,7 +2013,7 @@ const AdminDashboard: React.FC = () => {
                       <td className="py-5 px-6">
                         <div className="flex items-center space-x-2">
                           
-                          <span className="font-bold text-lg text-gray-900">{order.total.toFixed(2)}</span>
+                          <span className="font-bold text-lg text-gray-900">{order.total.toFixed(3)}</span>
                           <span className="text-sm text-gray-500 font-medium">{getCurrencySymbol()}</span>
                         </div>
                       </td>
@@ -2135,7 +2136,14 @@ const AdminDashboard: React.FC = () => {
         setNotifications={setNotifications}
       />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 rounded-3xl shadow-xl border border-gray-100">
-        <StatsCards users={users} products={products} orders={orders} totalRevenue={totalRevenue} />
+        <StatsCards 
+          users={users || []}
+          products={products || []}
+          orders={orders || []}
+          totalRevenue={orders?.reduce((sum, order) => sum + (order?.total || 0), 0) || 0}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+        />
         
         <TabBar 
           activeTab={activeTab} 
@@ -2143,20 +2151,259 @@ const AdminDashboard: React.FC = () => {
           users={users} 
           products={products} 
           orders={orders} 
-          taxes={taxes}
-          paymentMethods={paymentMethods}
-          currencies={currencies}
           onAddNew={handleAddNew} 
         />
         {/* Tab Content */}
         <div className="space-y-6">
-          {activeTab === 'users' && <UsersTable users={users} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} canDeleteUser={canDeleteUser} />}
-          {activeTab === 'products' && <ProductsTable products={products} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} taxes={taxes} />}
-          {activeTab === 'orders' && <OrdersTable orders={orders} users={users} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} />}
-          {activeTab === 'taxes' && <TaxesTable taxes={taxes} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDeleteTax} />}
-          {activeTab === 'paymentMethods' && <PaymentMethodsTable key={`payment-methods-${paymentMethods.length}`} paymentMethods={paymentMethods} searchTerm={searchTerm} handleView={handleView} handleEdit={handleEdit} handleDelete={handleDelete} handleToggleStatus={handleToggleStatus} onAddNew={handleAddNew} handleClearConfig={handleClearPaymentMethodConfig} />}
-          {activeTab === 'currency' && renderCurrencies()}
-          {activeTab === 'invoiceSettings' && <InvoiceSettings />}
+          {activeTab === 'users' && Array.isArray(users) && (
+            <UsersTable 
+              users={users}
+              searchTerm={searchTerm}
+              handleView={handleView}
+              handleEdit={handleEdit}
+              handleDelete={handleDelete}
+            />
+          )}
+          {activeTab === 'products' && Array.isArray(products) && (
+            <ProductsTable 
+              products={products}
+              searchTerm={searchTerm}
+              handleView={handleView}
+              handleEdit={handleEdit}
+              handleDelete={handleDelete}
+              taxes={taxes}
+            />
+          )}
+          {activeTab === 'orders' && Array.isArray(orders) && (
+            <OrdersTable 
+              orders={orders}
+              users={users}
+              searchTerm={searchTerm}
+              handleView={handleView}
+              handleEdit={handleEdit}
+              handleDelete={handleDelete}
+            />
+          )}
+          {activeTab === 'settings' && (
+            <>
+              <SettingsTabBar 
+                activeSettingsSubTab={activeSettingsSubTab} 
+                setActiveSettingsSubTab={setActiveSettingsSubTab} 
+                taxes={taxes}
+                paymentMethods={paymentMethods}
+                currencies={currencies}
+              />
+              {activeSettingsSubTab === 'taxes' && Array.isArray(taxes) && (
+                <TaxesTable 
+                  taxes={taxes} 
+                  searchTerm={searchTerm} 
+                  handleView={handleView} 
+                  handleEdit={handleEdit} 
+                  handleDelete={handleDelete} 
+                />
+              )}
+
+              {activeSettingsSubTab === 'paymentMethods' && Array.isArray(paymentMethods) && (
+                <PaymentMethodsTable 
+                  key={`payment-methods-${paymentMethods.length}`}
+                  paymentMethods={paymentMethods} 
+                  searchTerm={searchTerm} 
+                  handleView={handleView} 
+                  handleEdit={handleEdit} 
+                  handleDelete={handleDelete} 
+                  handleToggleStatus={handleToggleStatus}
+                  handleClearConfig={handleClearPaymentMethodConfig}
+                  onAddNew={() => {
+                    setModalType('add');
+                    setSelectedItem(null);
+                    setShowModal(true);
+                  }}
+                />
+              )}
+
+              {activeSettingsSubTab === 'currencies' && Array.isArray(currencies) && (
+                <div className="min-h-screen bg-gray-50">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-indigo-600 via-purple-500 to-pink-400 shadow-lg">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h1 className="text-2xl font-bold text-white">Currencies</h1>
+                          <p className="text-indigo-100 mt-1">Manage your store currencies and exchange rates</p>
+                        </div>
+                        {currencies.find(c => c.isBase) && (
+                          <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm text-white border border-white/30">
+                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                            </svg>
+                            Base: {currencies.find(c => c.isBase)?.code}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="bg-violet-50 rounded-2xl shadow-lg border border-violet-100/70 overflow-hidden">
+
+
+
+                    {/* Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exchange Rate</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {currencies.map((currency, index) => (
+                            <tr key={currency.id || `currency-${index}`} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{currency.name}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{currency.code}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{currency.symbol}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{currency.exchangeRate}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {currency.isBase ? (
+                                    <span 
+                                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                                      title="This is the base currency used throughout the website for price calculations and conversions"
+                                    >
+                                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                                      </svg>
+                                      Base
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleSetBaseCurrency(currency)}
+                                      disabled={togglingCurrencyId === currency.id}
+                                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 border border-gray-200 transition-colors cursor-pointer"
+                                      title="Click to set as base currency and activate for the entire website"
+                                    >
+                                      Set as Base
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {togglingCurrencyId === currency.id ? (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                      <div className="w-3 h-3 animate-spin rounded-full border-2 border-yellow-600 border-t-transparent mr-1"></div>
+                                      Updating...
+                                    </span>
+                                  ) : currency.isActive ? (
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                      currencies.filter(c => c.isActive).length === 1 
+                                        ? 'bg-orange-100 text-orange-800 border border-orange-200' 
+                                        : 'bg-green-100 text-green-800'
+                                    }`}>
+                                      {currencies.filter(c => c.isActive).length === 1 ? (
+                                        <>
+                                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                          </svg>
+                                          Only Active
+                                        </>
+                                      ) : (
+                                        'Active'
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                      Inactive
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => handleEdit(currency)}
+                                    className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                                          onClick={() => {
+                                    handleToggleCurrencyStatus(currency);
+                                  }}
+                                    disabled={togglingCurrencyId === currency.id || (currency.isActive && currencies.filter(c => c.isActive).length === 1)}
+                                    className={`p-1 rounded transition-colors ${
+                                      togglingCurrencyId === currency.id
+                                        ? 'opacity-50 cursor-not-allowed'
+                                        : (currency.isActive && currencies.filter(c => c.isActive).length === 1)
+                                          ? 'text-gray-400 cursor-not-allowed'
+                                          : currency.isActive 
+                                            ? 'text-green-600 hover:text-green-900 hover:bg-green-50' 
+                                            : 'text-orange-600 hover:text-orange-900 hover:bg-orange-50'
+                                    }`}
+                                    title={
+                                      currency.isActive && currencies.filter(c => c.isActive).length === 1
+                                        ? 'Cannot deactivate the only active currency'
+                                        : currency.isActive 
+                                          ? 'Deactivate' 
+                                          : 'Activate'
+                                    }
+                                  >
+                                    {togglingCurrencyId === currency.id ? (
+                                      <div className="w-4 h-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+                                    ) : currency.isActive ? (
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    ) : (
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(currency.id)}
+                                    className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Empty State */}
+                    {currencies?.length === 0 && (
+                      <div className="text-center py-12">
+                        <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No currencies found</h3>
+                        <p className="text-gray-500 max-w-sm mx-auto">Add your first currency to get started.</p>
+                      </div>
+                    )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {activeSettingsSubTab === 'invoiceSettings' && <InvoiceSettings />}
+            </>
+          )}
         </div>
         {showModal && (
                   <Modal
@@ -2167,6 +2414,7 @@ const AdminDashboard: React.FC = () => {
           selectedItem={selectedItem}
           handleSave={handleSave}
           activeTab={activeTab}
+          activeSettingsSubTab={activeSettingsSubTab}
           users={users}
           products={products}
           orders={orders}

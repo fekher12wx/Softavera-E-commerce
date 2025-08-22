@@ -90,7 +90,7 @@ export function calculateCartTotals(
  * Format price for display with currency
  */
 export function formatPrice(price: number, currencySymbol: string): string {
-  return `${price.toFixed(2)} ${currencySymbol}`;
+  return `${price.toFixed(3)} ${currencySymbol}`;
 }
 
 /**

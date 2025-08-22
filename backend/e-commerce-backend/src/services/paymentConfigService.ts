@@ -37,20 +37,42 @@ export class PaymentConfigService {
       const expiry = this.cacheExpiry.get(providerCode);
       
       if (cached && expiry && Date.now() < expiry) {
+        console.log(`📦 Using cached ${providerCode} configuration`);
         return cached;
       }
 
+      console.log(`🔍 Fetching ${providerCode} configuration from database...`);
+      
       // Fetch from database
       const paymentMethod = await dataService.getPaymentMethodByCode(providerCode);
-      if (!paymentMethod || !paymentMethod.isActive) {
+      if (!paymentMethod) {
+        console.log(`❌ ${providerCode} payment method not found in database`);
+        return null;
+      }
+      
+      if (!paymentMethod.isActive) {
+        console.log(`❌ ${providerCode} payment method is not active`);
         return null;
       }
 
-      const config = this.parseProviderConfig(providerCode, paymentMethod.config);
+      console.log(`📋 Raw ${providerCode} config from database:`, JSON.stringify(paymentMethod.config, null, 2));
       
-      // Decode sensitive fields before returning
+      const config = this.parseProviderConfig(providerCode, paymentMethod.config);
+      console.log(`🔧 Parsed ${providerCode} config:`, JSON.stringify(config, null, 2));
+      
+      // For Paymee, we've already manually decoded the sensitive fields, so skip encryption service
+      if (providerCode.toLowerCase() === 'paymee') {
+        console.log(`🔓 Skipping encryption service for ${providerCode} (already manually decoded)`);
+        // Cache the manually decoded result
+        this.configCache.set(providerCode, config);
+        this.cacheExpiry.set(providerCode, Date.now() + this.CACHE_DURATION);
+        return config;
+      }
+      
+      // Decode sensitive fields before returning (for other providers)
       const encryptionServiceInstance = new encryptionService();
       const decryptedConfig = encryptionServiceInstance.decodePaymentConfig(config);
+      console.log(`🔓 Decrypted ${providerCode} config:`, JSON.stringify(decryptedConfig, null, 2));
       
       // Cache the decrypted result
       this.configCache.set(providerCode, decryptedConfig);
@@ -58,7 +80,7 @@ export class PaymentConfigService {
       
       return decryptedConfig;
     } catch (error) {
-      console.error(`Error getting ${providerCode} configuration:`, error);
+      console.error(`❌ Error getting ${providerCode} configuration:`, error);
       return null;
     }
   }
@@ -82,11 +104,72 @@ export class PaymentConfigService {
         };
 
       case 'paymee':
+        console.log('🔍 Parsing Paymee config with fields:', {
+          apiToken: config.apiToken || config.apiKey || 'MISSING',
+          vendorId: config.vendorId || config.vendor || 'MISSING',
+          baseUrl: config.baseUrl || 'DEFAULT',
+          environment: config.environment || 'DEFAULT'
+        });
+        
+        // Handle vendorId - it might be double-encoded
+        let vendorId = 0;
+        if (config.vendorId) {
+          try {
+            // First try to parse as integer
+            vendorId = parseInt(config.vendorId);
+            if (isNaN(vendorId)) {
+              // If that fails, try to decode from base64 first
+              const decodedVendorId = Buffer.from(config.vendorId, 'base64').toString('utf8');
+              vendorId = parseInt(decodedVendorId);
+              if (isNaN(vendorId)) {
+                console.warn('⚠️ Could not parse vendorId:', config.vendorId);
+                vendorId = 0;
+              }
+            }
+          } catch (error) {
+            console.warn('⚠️ Error parsing vendorId:', error);
+            vendorId = 0;
+          }
+        }
+        
+        // Handle apiToken - it might be double-encoded
+        let apiToken = '';
+        if (config.apiToken || config.apiKey) {
+          try {
+            const rawToken = config.apiToken || config.apiKey;
+            // First try to decode from base64
+            const decodedToken = Buffer.from(rawToken, 'base64').toString('utf8');
+            // Check if the decoded result is also base64 encoded
+            if (decodedToken.match(/^[A-Za-z0-9+/=]+$/)) {
+              // If it looks like base64, decode it again
+              try {
+                const doubleDecodedToken = Buffer.from(decodedToken, 'base64').toString('utf8');
+                apiToken = doubleDecodedToken;
+                console.log('🔍 Double-decoded apiToken from:', rawToken, 'to:', apiToken);
+              } catch {
+                // If double decoding fails, use single decoded
+                apiToken = decodedToken;
+                console.log('🔍 Single-decoded apiToken from:', rawToken, 'to:', apiToken);
+              }
+            } else {
+              // If it doesn't look like base64, use as-is
+              apiToken = decodedToken;
+              console.log('🔍 Decoded apiToken from:', rawToken, 'to:', apiToken);
+            }
+          } catch (error) {
+            console.warn('⚠️ Error decoding apiToken:', error);
+            apiToken = config.apiToken || config.apiKey || '';
+          }
+        }
+        
+        console.log('🔍 Parsed vendorId:', vendorId);
+        console.log('🔍 Parsed apiToken:', apiToken);
+        
         return {
           ...baseConfig,
-          apiToken: config.apiToken || config.apiKey || '',
+          apiToken: apiToken,
           baseUrl: config.baseUrl || 'https://sandbox.paymee.tn/api/v2',
-          vendorId: parseInt(config.vendorId || config.vendor || '0'),
+          vendorId: vendorId,
           environment: config.environment || 'sandbox'
         };
 

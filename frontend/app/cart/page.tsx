@@ -134,7 +134,7 @@ const Cart: React.FC = () => {
       console.warn('⚠️ Price discrepancy detected:', {
         cartContextTotal: totalWithTax,
         calculatedTotal: total + totalTax,
-        difference: difference.toFixed(2)
+        difference: difference.toFixed(3)
       });
     }
   }, [cart, total, totalWithTax, defaultTax]);
@@ -609,7 +609,7 @@ if (cart.length === 0) {
                         <div>
                           <h2 className="text-xl font-bold text-gray-800 mb-2">{item.product.name}</h2>
                           <p className="text-gray-600 font-medium">
-                            💰 {convertPrice(item.product.price).toFixed(2)} {getCurrencySymbol()}
+                            💰 {convertPrice(item.product.price).toFixed(3)} {getCurrencySymbol()}
                           </p>
                         </div>
                       </div>
@@ -633,7 +633,7 @@ if (cart.length === 0) {
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
-                            {convertPrice(item.product.price * item.quantity).toFixed(2)} {getCurrencySymbol()}
+                            {convertPrice(item.product.price * item.quantity).toFixed(3)} {getCurrencySymbol()}
                           </p>
                           <button
                             onClick={() => removeFromCart(item.product.id)}
@@ -675,7 +675,7 @@ if (cart.length === 0) {
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">{t('subtotal')}:</span>
-                    <span className="font-semibold text-gray-800">{convertPrice(total).toFixed(2)} {getCurrencySymbol()}</span>
+                    <span className="font-semibold text-gray-800">{convertPrice(total).toFixed(3)} {getCurrencySymbol()}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">{t('shipping')}:</span>
@@ -683,13 +683,13 @@ if (cart.length === 0) {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">{t('tax')}:</span>
-                    <span className="font-semibold text-gray-800">{convertPrice(totalWithTax - total).toFixed(2)} {getCurrencySymbol()}</span>
+                    <span className="font-semibold text-gray-800">{convertPrice(totalWithTax - total).toFixed(3)} {getCurrencySymbol()}</span>
                   </div>
                   <hr className="border-gray-300" />
                   <div className="flex justify-between items-center text-xl">
                     <span className="font-bold text-gray-800">{t('total')} (with tax):</span>
                     <span className="font-bold text-2xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      {convertPrice(totalWithTax).toFixed(2)} {getCurrencySymbol()}
+                      {convertPrice(totalWithTax).toFixed(3)} {getCurrencySymbol()}
                     </span>
                   </div>
                 </div>

@@ -53,9 +53,20 @@ export async function createPaymeePayment(params: CreatePaymeePaymentParams): Pr
   try {
     // Get configuration from database
     const config = await paymentConfigService.getProviderConfig('paymee');
+    console.log('🔍 Paymee config retrieved:', JSON.stringify(config, null, 2));
+    
     if (!config) {
       throw new Error('Paymee configuration not found or inactive');
     }
+
+    // Log the specific fields we're looking for
+    console.log('🔍 Paymee config fields:', {
+      apiToken: config.apiToken,
+      vendorId: config.vendorId,
+      baseUrl: config.baseUrl,
+      environment: config.environment,
+      isActive: config.isActive
+    });
 
     if (!config.apiToken) {
       throw new Error('Paymee API Token is not configured');
@@ -109,9 +120,12 @@ export async function createPaymeePayment(params: CreatePaymeePaymentParams): Pr
 
     // If a return URL is provided, include it using a common key name Paymee accepts
     // Some integrations expect `return_url` or `redirect_url`; include both defensively
-    if (returnUrl) {
+    // Note: Paymee requires HTTPS URLs, so skip for localhost development
+    if (returnUrl && !returnUrl.includes('localhost')) {
       paymentData.return_url = returnUrl;
       paymentData.redirect_url = returnUrl;
+    } else if (returnUrl && returnUrl.includes('localhost')) {
+      console.log('⚠️ Skipping return_url for localhost (Paymee requires HTTPS)');
     }
 
 
@@ -125,9 +139,31 @@ export async function createPaymeePayment(params: CreatePaymeePaymentParams): Pr
       timeout: 30000
     });
 
+    // Log the request details
+    console.log('🔍 Paymee API Request Details:');
+    console.log('  - URL:', `${config.baseUrl}/payments/create`);
+    console.log('  - Authorization:', `Token ${config.apiToken.substring(0, 10)}...`);
+    console.log('  - Request Data:', JSON.stringify(paymentData, null, 2));
+
     const response = await paymeeClient.post('/payments/create', paymentData);
 
+    // Add detailed logging to debug the response
+    console.log('🔍 Paymee API Response Status:', response.status);
+    console.log('🔍 Paymee API Response Headers:', response.headers);
+    console.log('🔍 Paymee API Response Data:', JSON.stringify(response.data, null, 2));
+
+    // Check if Paymee returned an error response
+    if (response.data && response.data.status === false) {
+      const errorMessage = response.data.message || 'Payment creation failed';
+      const errorDetails = response.data.errors ? response.data.errors.map((e: any) => Object.values(e).join(': ')).join(', ') : '';
+      throw new Error(`Paymee API Error: ${errorMessage}${errorDetails ? ` - ${errorDetails}` : ''}`);
+    }
+
     if (!response.data || !response.data.data) {
+      console.error('❌ Paymee API Response validation failed:');
+      console.error('  - response.data exists:', !!response.data);
+      console.error('  - response.data.data exists:', !!(response.data && response.data.data));
+      console.error('  - Full response structure:', JSON.stringify(response.data, null, 2));
       throw new Error('Invalid response from Paymee API');
     }
 

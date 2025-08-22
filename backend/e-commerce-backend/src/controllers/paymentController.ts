@@ -185,6 +185,7 @@ const paymentController = {
         returnUrl
       });
 
+      console.log('🔍 Controller returning payment response:', JSON.stringify(paymentResponse, null, 2));
       res.status(200).json(paymentResponse);
     } catch (error) {
       console.error('Paymee payment creation error:', error);

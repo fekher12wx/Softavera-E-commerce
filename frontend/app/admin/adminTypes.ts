@@ -93,7 +93,8 @@ export interface Currency {
   updatedAt: string;
 }
 
-export type TabType = 'users' | 'products' | 'orders' | 'taxes' | 'paymentMethods' | 'currency' | 'invoiceSettings';
+export type TabType = 'users' | 'products' | 'orders' | 'settings';
+export type SettingsSubTab = 'taxes' | 'paymentMethods' | 'currencies' | 'invoiceSettings';
 export type ModalType = 'add' | 'edit' | 'view' | 'add-tax';
 
 interface ModalProps {

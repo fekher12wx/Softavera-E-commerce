@@ -259,7 +259,7 @@ const OrdersModal: React.FC<OrdersModalProps> = ({
                               </p>
                             </div>
                             <p className="font-medium text-gray-800">
-                              {convertPrice(item.product.price * item.quantity).toFixed(2)} {getCurrencySymbol()}
+                              {convertPrice(item.product.price * item.quantity).toFixed(3)} {getCurrencySymbol()}
                             </p>
                           </div>
                           {/* Reviews List */}
@@ -298,7 +298,7 @@ const OrdersModal: React.FC<OrdersModalProps> = ({
 
                   <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
                     <span className="text-gray-600">{t('total')}</span>
-                    <span className="font-semibold text-gray-800">{convertPrice(order.total).toFixed(2)} {getCurrencySymbol()}</span>
+                    <span className="font-semibold text-gray-800">{convertPrice(order.total).toFixed(3)} {getCurrencySymbol()}</span>
                   </div>
                 </div>
               ))}
