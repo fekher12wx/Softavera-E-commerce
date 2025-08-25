@@ -1,4 +1,4 @@
-# 🛍️ AURES E-Commerce Platform
+# 🛍️ Softavera E-Commerce Platform
 
 A modern, full-stack e-commerce solution built with Next.js, Node.js, and PostgreSQL. Features multi-payment gateway integration, real-time tax calculations, and a responsive admin dashboard.
 
