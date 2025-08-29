@@ -23,6 +23,7 @@ interface CurrencyContextType {
   loading: boolean;
   error: string | null;
   convertPrice: (price: number, fromCurrency?: BaseCurrency) => number;
+  convertProductPrice: (price: number) => number;
   getCurrencySymbol: () => string;
 }
 
@@ -150,6 +151,11 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
     return Math.round(basePrice * 100) / 100;
   };
 
+  const convertProductPrice = (price: number): number => {
+    if (!baseCurrency) return price;
+    return Math.round(price * baseCurrency.exchangeRate * 100) / 100;
+  };
+
   const getCurrencySymbol = (): string => {
     return baseCurrency?.symbol || '$';
   };
@@ -164,6 +170,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
       loading,
       error,
       convertPrice,
+      convertProductPrice,
       getCurrencySymbol,
     }}>
       {children}

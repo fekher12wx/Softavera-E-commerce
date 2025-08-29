@@ -137,6 +137,7 @@ function Modal({
     if (activeTab === 'users') {
       return {
         ...item,
+        role: item?.role || 'USER', // Ensure role always has a default value
         address: {
           street: item?.address?.street || '',
           city: item?.address?.city || '',
@@ -157,7 +158,7 @@ function Modal({
         image: item?.image || '',
         ...item
       };
-    } else if (activeTab === 'settings') {
+    } else if (activeTab === 'customize') {
       if (activeSettingsSubTab === 'taxes') {
         // Initialize tax fields with proper defaults
         return {
@@ -1145,7 +1146,7 @@ function Modal({
             <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl p-4 border border-violet-100">
               <h3 className="text-sm font-bold text-violet-800 mb-2">FROM</h3>
               <div className="space-y-1">
-                <div className="font-bold text-gray-900">E-Shop</div>
+                <div className="font-bold text-gray-900">Softavera</div>
                 <div className="text-sm text-gray-600">Tunis, Tunisia</div>
               </div>
             </div>
@@ -1248,9 +1249,9 @@ function Modal({
           {modalType === 'add-tax' && renderCreateTaxFields()}
           {modalType !== 'add-tax' && activeTab === 'users' && renderUserFields()}
           {modalType !== 'add-tax' && activeTab === 'products' && renderProductFields()}
-                  {modalType !== 'add-tax' && activeTab === 'settings' && activeSettingsSubTab === 'taxes' && renderTaxFields()}
-        {modalType !== 'add-tax' && activeTab === 'settings' && activeSettingsSubTab === 'paymentMethods' && renderPaymentMethodFields()}
-        {modalType !== 'add-tax' && activeTab === 'settings' && activeSettingsSubTab === 'currencies' && renderCurrencyFields()}
+                  {modalType !== 'add-tax' && activeTab === 'customize' && activeSettingsSubTab === 'taxes' && renderTaxFields()}
+        {modalType !== 'add-tax' && activeTab === 'customize' && activeSettingsSubTab === 'paymentMethods' && renderPaymentMethodFields()}
+        {modalType !== 'add-tax' && activeTab === 'customize' && activeSettingsSubTab === 'currencies' && renderCurrencyFields()}
           {modalType !== 'add-tax' && activeTab === 'orders' && isViewMode && renderOrderInvoice()}
           {modalType !== 'add-tax' && activeTab === 'orders' && !isViewMode && (
             <div className="p-6">

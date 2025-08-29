@@ -15,7 +15,7 @@ type PasswordField = 'currentPassword' | 'newPassword' | 'confirmPassword';
 
 const ProfilePage = () => {
   const { t } = useLanguage();
-  const { getCurrencySymbol, convertPrice } = useCurrency();
+  const { getCurrencySymbol, convertProductPrice } = useCurrency();
   const [user, setUser] = useState<User | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +35,7 @@ const ProfilePage = () => {
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showAllOrders, setShowAllOrders] = useState(false);
 
   const router = useRouter();
 
@@ -245,6 +246,12 @@ const ProfilePage = () => {
     return `http://localhost:3001/uploads/${imagePath}`;
   };
 
+  // Get orders to display based on showAllOrders state
+  const getDisplayedOrders = () => {
+    return showAllOrders ? orders : orders.slice(0, 3);
+  };
+
+  const hasMoreOrders = orders.length > 3;
 
 
   if (loading) {
@@ -355,9 +362,16 @@ const ProfilePage = () => {
 
             {/* Orders Card */}
             <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-6">
-                {t('order_history')}
-              </h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  {t('order_history')}
+                </h2>
+                {orders.length > 0 && (
+                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    {t('showing')} {getDisplayedOrders().length} {t('of')} {orders.length} {t('orders_total')}
+                  </span>
+                )}
+              </div>
               {orders.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">📦</div>
@@ -366,7 +380,7 @@ const ProfilePage = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {orders.map((order) => (
+                  {getDisplayedOrders().map((order) => (
                     <div key={order.id} className="p-6 bg-gray-50 rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
                       {/* Product thumbnails and names */}
                       <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -405,7 +419,7 @@ const ProfilePage = () => {
                           </p>
                         </div>
                         <div className="text-right flex flex-col gap-2 items-end">
-                          <p className="font-bold text-xl text-gray-900 mb-3">{currencySymbol}{convertPrice(order.total).toFixed(3)}</p>
+                          <p className="font-bold text-xl text-gray-900 mb-3">{currencySymbol}{convertProductPrice(order.total).toFixed(3)}</p>
                           {canCancelOrder(order) && (
                             <button
                               onClick={() => handleCancelOrder(order.id)}
@@ -432,6 +446,25 @@ const ProfilePage = () => {
                       </div>
                     </div>
                   ))}
+                                     {hasMoreOrders && (
+                     <div className="flex gap-3 mt-4">
+                       {!showAllOrders ? (
+                         <button
+                           onClick={() => setShowAllOrders(true)}
+                           className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 text-center font-medium shadow-md hover:shadow-lg"
+                         >
+                           📋 {t('show_more_orders')} ({orders.length - 3} {t('more')})
+                         </button>
+                       ) : (
+                         <button
+                           onClick={() => setShowAllOrders(false)}
+                           className="flex-1 px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all duration-200 text-center font-medium shadow-md hover:shadow-lg"
+                         >
+                           🔽 {t('show_less')}
+                         </button>
+                       )}
+                     </div>
+                   )}
                 </div>
               )}
             </div>

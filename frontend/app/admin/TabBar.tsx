@@ -1,8 +1,6 @@
 import React from 'react';
 import { Users, Package, ShoppingCart, Plus, DollarSign, Percent, CreditCard, Settings, Coins, ChevronDown } from 'lucide-react';
-
-// Mock types for demonstration
-type TabType = 'users' | 'products' | 'orders' | 'settings';
+import { TabType } from './adminTypes';
 
 interface TabBarProps {
   activeTab: TabType;
@@ -22,7 +20,7 @@ const TabBar = ({
   onAddNew 
 }: TabBarProps) => {
   
-  const tabs: TabType[] = ['users', 'products', 'orders', 'settings'];
+  const tabs: TabType[] = ['users', 'products', 'orders', 'customize'];
 
   const getTabConfig = (tab: TabType) => {
     const configs = {
@@ -51,8 +49,8 @@ const TabBar = ({
         textColor: 'text-orange-600'
       },
 
-      settings: { 
-        label: 'Settings', 
+      customize: { 
+        label: 'Customize', 
         icon: Settings, 
         count: undefined,
         color: 'from-slate-500 to-gray-500',
@@ -106,8 +104,8 @@ const TabBar = ({
         })}
       </div>
       
-      {/* Compact Add Button - Hidden for Settings */}
-      {activeTab !== 'settings' && (
+      {/* Compact Add Button - Hidden for Customize */}
+      {activeTab !== 'customize' && (
         <button
           onClick={onAddNew}
           className="group relative overflow-hidden px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"

@@ -14,7 +14,7 @@ interface ProductsTableProps {
 }
 
 const ProductsTable: React.FC<ProductsTableProps> = ({ products, searchTerm, handleView, handleEdit, handleDelete, taxes }) => {
-  const { getCurrencySymbol } = useCurrency();
+  const { convertProductPrice, getCurrencySymbol } = useCurrency();
   const { t } = useLanguage();
   
   return (
@@ -110,7 +110,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({ products, searchTerm, han
                     <td className="py-5 px-6">
                       <div className="flex items-center space-x-2">
                         <span className="text-lg font-bold text-gray-900">
-                          {getCurrencySymbol()}{product.price?.toFixed(3)}
+                          {getCurrencySymbol()}{convertProductPrice(product.price)}
                         </span>
                       </div>
                     </td>

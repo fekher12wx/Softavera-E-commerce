@@ -14,7 +14,7 @@ interface ProductDetailsProps {
 
 const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
   const { addToCart } = useCart();
-  const { convertPrice, getCurrencySymbol } = useCurrency();
+  const { convertProductPrice, getCurrencySymbol } = useCurrency();
   const { t } = useLanguage();
   const { user } = useAuth();
   const [quantity, setQuantity] = useState(1);
@@ -77,7 +77,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
             <div className="flex-1 space-y-6">
               <h1 className="text-4xl font-bold text-gray-800 leading-tight">{product.name}</h1>
               <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                {convertPrice(product.price).toFixed(3)} {getCurrencySymbol()}
+                {convertProductPrice(product.price).toFixed(3)} {getCurrencySymbol()}
               </div>
               <div className="text-gray-600 text-lg">{product.description}</div>
               <div>
@@ -94,10 +94,10 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
               </div>
               <button
                 onClick={handleAddToCart}
-                disabled={product.stock === 0}
+                disabled={product.stock <= 0}
                 className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {product.stock === 0 ? t('out_of_stock') : t('add_to_cart')}
+                {product.stock <= 0 ? t('out_of_stock') : t('add_to_cart')}
               </button>
             </div>
           </div>

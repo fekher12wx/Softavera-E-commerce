@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { AuthRequest } from '../middleware/auth';
 import { safeRedis } from '../config/redis';
 import dataService from '../services/dataService';
+import { sendWelcomeEmail } from '../utils/mailer';
 
 interface RegisterRequest {
   email: string;
@@ -58,6 +59,14 @@ class AuthController {
 
       const { token, refreshToken } = this.generateTokens(newUser);
       const { password: _, ...userWithoutPassword } = newUser;
+
+      // Send welcome email (automatically filtered by email validator)
+      try {
+        await sendWelcomeEmail(email, name);
+      } catch (emailError) {
+        console.error('❌ Failed to send welcome email:', emailError);
+        // Don't fail registration if email fails
+      }
 
       return res.status(201).json({
         message: `Welcome ${name}, your account has been created 🎉`,
@@ -234,7 +243,47 @@ class AuthController {
       return res.json({ message: 'Password updated successfully' });
     } catch (error) {
       console.error('Change password error:', error);
-      return res.status(500).json({ error: 'Failed to change password' });
+      return res.status(500).json({ error: 'Failed to update password' });
+    }
+  }
+
+  async updateUserRole(req: AuthRequest, res: Response) {
+    try {
+      const { userId, newRole } = req.body;
+      const adminId = req.user!.id;
+
+      // Check if current user is admin
+      if (req.user!.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Insufficient permissions. Admin access required.' });
+      }
+
+      if (!userId || !newRole) {
+        return res.status(400).json({ error: 'User ID and new role are required' });
+      }
+
+      // Validate role
+      const validRoles = ['USER', 'ADMIN'];
+      if (!validRoles.includes(newRole)) {
+        return res.status(400).json({ error: 'Invalid role. Must be USER or ADMIN.' });
+      }
+
+      // Prevent admin from removing their own admin role
+      if (userId === adminId && newRole !== 'ADMIN') {
+        return res.status(400).json({ error: 'Cannot remove your own admin role' });
+      }
+
+      const updatedUser = await dataService.updateUser(userId, { role: newRole });
+      if (!updatedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      return res.json({ 
+        message: `User role updated successfully to ${newRole}`,
+        user: updatedUser 
+      });
+    } catch (error) {
+      console.error('Update user role error:', error);
+      return res.status(500).json({ error: 'Failed to update user role' });
     }
   }
 

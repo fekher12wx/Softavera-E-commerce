@@ -27,6 +27,8 @@ export class ProductController {
       res.status(500).json({ error: 'Internal server error' });
     }
   }
+
+  // GET /api/products/category/:category
   async getProductsByCategory(req: Request, res: Response): Promise<void> {
     try {
       const { category } = req.params;
@@ -41,6 +43,42 @@ export class ProductController {
     } catch (error) {
       console.error('Error fetching products by category:', error);
       res.status(500).json({ error: 'Failed to fetch products by category' });
+    }
+  }
+
+  // GET /api/products/subcategory/:subcategory
+  async getProductsBySubcategory(req: Request, res: Response): Promise<void> {
+    try {
+      const { subcategory } = req.params;
+      const products = await dataService.getProductsBySubcategory(subcategory);
+
+      if (!products || products.length === 0) {
+        res.status(404).json({ error: 'No products found in this subcategory' });
+        return;
+      }
+
+      res.json(products);
+    } catch (error) {
+      console.error('Error fetching products by subcategory:', error);
+      res.status(500).json({ error: 'Failed to fetch products by subcategory' });
+    }
+  }
+
+  // GET /api/products/category/:category/subcategory/:subcategory
+  async getProductsByCategoryAndSubcategory(req: Request, res: Response): Promise<void> {
+    try {
+      const { category, subcategory } = req.params;
+      const products = await dataService.getProductsByCategoryAndSubcategory(category, subcategory);
+
+      if (!products || products.length === 0) {
+        res.status(404).json({ error: 'No products found in this category and subcategory' });
+        return;
+      }
+
+      res.json(products);
+    } catch (error) {
+      console.error('Error fetching products by category and subcategory:', error);
+      res.status(500).json({ error: 'Failed to fetch products by category and subcategory' });
     }
   }
 
@@ -117,6 +155,14 @@ try {
     return;
   }
 
+  // Invalidate Redis cache to ensure fresh data is served
+  try {
+    await safeRedis.del('products:all');
+  } catch (cacheError) {
+    console.error('Failed to invalidate product cache:', cacheError);
+    // Don't fail the request if cache invalidation fails
+  }
+
   res.json(product);
 } catch (error) {
   console.error('Error patching product:', error);
@@ -133,6 +179,14 @@ try {
       if (!deleted) {
         res.status(404).json({ error: 'Product not found' });
         return;
+      }
+
+      // Invalidate Redis cache to ensure fresh data is served
+      try {
+        await safeRedis.del('products:all');
+      } catch (cacheError) {
+        console.error('Failed to invalidate product cache:', cacheError);
+        // Don't fail the request if cache invalidation fails
       }
 
       res.json({ message: 'Product deleted successfully' });

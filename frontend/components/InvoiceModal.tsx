@@ -29,21 +29,21 @@ interface InvoiceModalProps {
 
 const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, user, onClose }) => {
   const { t } = useLanguage();
-  const { getCurrencySymbol, convertPrice } = useCurrency();
+  const { convertProductPrice, getCurrencySymbol } = useCurrency();
   const { getTaxById, defaultTax } = useTax();
   const modalRef = useRef<HTMLDivElement>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
   
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({
-    companyName: 'E-Shop',
+    companyName: 'Softavera',
     companyTagline: 'Your Trusted Online Store',
-    companyEmail: 'contact@e-shop.com',
-    companyWebsite: 'e-shop.com',
-    companyAddress: '123 Business Street',
+    companyEmail: 'contact@softavera.com',
+    companyWebsite: 'softavera.com',
+    companyAddress: '123 Business Street, City, Country',
     companyCity: 'Tunis',
     companyCountry: 'Tunisia',
-    companyPhone: '+216 71 234 567',
-    paymentText: 'Payment to E-Shop',
+    companyPhone: '+1 234 567 8900',
+    paymentText: 'Payment to Softavera',
     logoUrl: '',
     primaryColor: '#8B5CF6',
     secondaryColor: '#EC4899',
@@ -140,9 +140,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, user, onClose }) => 
   };
 
   const { subtotal: subtotalRaw, totalTax: totalTaxRaw, itemTaxes } = calculateDetailedTax();
-  const subtotal = convertPrice(subtotalRaw);
-  const totalTax = convertPrice(totalTaxRaw);
-  const total = convertPrice(subtotalRaw + totalTaxRaw);
+  const subtotal = convertProductPrice(subtotalRaw);
+  const totalTax = convertProductPrice(totalTaxRaw);
+  const total = convertProductPrice(subtotalRaw + totalTaxRaw);
 
   // Create gradient style from colors
   const getGradientStyle = () => {
@@ -298,9 +298,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, user, onClose }) => 
                   } : {}}
                 >
                   <td className="py-1 px-2 text-xs">{item.product?.name || 'Product'}</td>
-                  <td className="text-center py-1 px-2 text-xs">{symbol}{convertPrice(item.product?.price).toFixed(3)}</td>
+                  <td className="text-center py-1 px-2 text-xs">{symbol}{convertProductPrice(item.product?.price).toFixed(3)}</td>
                   <td className="text-center py-1 px-2 text-xs">{item.quantity.toString().padStart(2, '0')}</td>
-                  <td className="text-right py-1 px-2 text-xs font-medium">{symbol}{convertPrice(item.product?.price * item.quantity).toFixed(3)}</td>
+                  <td className="text-right py-1 px-2 text-xs font-medium">{symbol}{convertProductPrice(item.product?.price * item.quantity).toFixed(3)}</td>
                 </tr>
               ))}
             </tbody>

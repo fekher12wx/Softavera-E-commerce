@@ -36,20 +36,16 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1);
   const PRODUCTS_PER_PAGE = 10;
 
-  // Fetch products
+  // Fetch all products once on component mount
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchAllProducts = async () => {
       setLoading(true);
       try {
-        let url = 'http://localhost:3001/api/products';
-        if (activeCategory) {
-          url = `http://localhost:3001/api/products/category/${encodeURIComponent(activeCategory)}`;
-        }
-        const res = await fetch(url);
+        const res = await fetch('http://localhost:3001/api/products');
         if (!res.ok) throw new Error('Failed to fetch products');
         const data = await res.json();
         setProducts(data);
-        setFilteredProducts(data); // Optionally, keep subcategory filtering below
+        setFilteredProducts(data);
       } catch (error) {
         console.error('Error fetching products:', error);
         setProducts([]);
@@ -59,26 +55,29 @@ export default function Home() {
       }
     };
 
-    fetchProducts();
-  }, [activeCategory]);
+    fetchAllProducts();
+  }, []); // Only run once on mount
 
-  // Filter products based on active filters
+  // Client-side filtering - no more API calls
   useEffect(() => {
     let filtered = [...products];
-
-    if (activeSubcategory) {
-      filtered = filtered.filter(product => {
-        // Check subcategory, brand, or product name
-        return (
-          product.subcategory?.toLowerCase() === activeSubcategory.toLowerCase() ||
-          product.brand?.toLowerCase() === activeSubcategory.toLowerCase() ||
-          product.name.toLowerCase().includes(activeSubcategory.toLowerCase())
-        );
-      });
+    
+    // Filter by category if selected
+    if (activeCategory) {
+      filtered = filtered.filter(product => 
+        product.category.toLowerCase().includes(activeCategory.toLowerCase())
+      );
     }
-
+    
+    // Filter by subcategory if selected
+    if (activeSubcategory) {
+      filtered = filtered.filter(product => 
+        product.subcategory && product.subcategory.toLowerCase().includes(activeSubcategory.toLowerCase())
+      );
+    }
+    
     setFilteredProducts(filtered);
-  }, [products, activeSubcategory]);
+  }, [activeCategory, activeSubcategory, products]);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -103,35 +102,34 @@ export default function Home() {
   const hasMore = visibleCount < filteredProducts.length;
 
   const handleCategoryFilter = (category: string) => {
-    setActiveCategory(category || null);
-    setActiveSubcategory(null); // Reset subcategory when category changes
+    if (activeCategory === category) {
+      // If clicking the same category, clear it
+      setActiveCategory(null);
+      setActiveSubcategory(null);
+    } else {
+      // If clicking a different category, set it and clear subcategory
+      setActiveCategory(category);
+      setActiveSubcategory(null);
+    }
   };
 
   const handleSubcategoryFilter = (subcategory: string) => {
-    setActiveSubcategory(subcategory || null);
+    if (activeSubcategory === subcategory) {
+      // If clicking the same subcategory, clear it
+      setActiveSubcategory(null);
+    } else {
+      // If clicking a different subcategory, set it and clear category
+      setActiveSubcategory(subcategory);
+      setActiveCategory(null);
+    }
   };
 
-  // Add a useEffect to fetch all products when both filters are cleared
-  useEffect(() => {
-    if (!activeCategory && !activeSubcategory) {
-      const fetchAllProducts = async () => {
-        setLoading(true);
-        try {
-          const res = await fetch('http://localhost:3001/api/products');
-          if (!res.ok) throw new Error('Failed to fetch products');
-          const data = await res.json();
-          setProducts(data);
-          setFilteredProducts(data);
-        } catch (error) {
-          setProducts([]);
-          setFilteredProducts([]);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchAllProducts();
-    }
-  }, [activeCategory, activeSubcategory]);
+  const resetFilters = () => {
+    setActiveCategory(null);
+    setActiveSubcategory(null);
+  };
+
+
 
   if (loading) {
     return (
@@ -166,18 +164,23 @@ export default function Home() {
         <section className="flex-1">
           {/* Filter Status */}
           <div className="mb-6">
-            <p className="text-gray-600">
-              {activeCategory && (
-                <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  {activeCategory}
-                </span>
-              )}
-              {activeSubcategory && (
-                <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                  {activeSubcategory}
-                </span>
-              )}
-            </p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {activeCategory && (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    {activeCategory}
+                  </span>
+                )}
+                {activeSubcategory && (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                    {activeSubcategory}
+                  </span>
+                )}
+              </div>
+              <div className="text-sm text-gray-500">
+                {filteredProducts.length} of {products.length} products
+              </div>
+            </div>
           </div>
 
           {/* Products Grid */}

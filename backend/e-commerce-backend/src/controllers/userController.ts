@@ -125,8 +125,29 @@ export class UserController {
     try {
       const { id } = req.params;
       const updates = req.body;
+      const currentUser = req.user!;
       
-   
+      // Check if user is trying to update role
+      if (updates.role && updates.role !== currentUser.role) {
+        // Only admins can change roles
+        if (currentUser.role !== UserRole.ADMIN) {
+          res.status(403).json({ error: 'Insufficient permissions. Admin access required to change user roles.' });
+          return;
+        }
+        
+        // Prevent admin from removing their own admin role
+        if (id === currentUser.id && updates.role !== UserRole.ADMIN) {
+          res.status(400).json({ error: 'Cannot remove your own admin role' });
+          return;
+        }
+        
+        // Validate role
+        const validRoles = ['USER', 'ADMIN'];
+        if (!validRoles.includes(updates.role)) {
+          res.status(400).json({ error: 'Invalid role. Must be USER or ADMIN.' });
+          return;
+        }
+      }
 
       // Convert flat address fields to address object
       const addressFields = ['street', 'city', 'zipCode', 'country'];
@@ -136,6 +157,7 @@ export class UserController {
       
       if (hasAddressFields) {
         updateData = {
+          ...updateData, // Keep all existing fields including role
           address: {
             street: updates.street || '',
             city: updates.city || '',

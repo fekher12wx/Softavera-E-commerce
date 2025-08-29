@@ -179,6 +179,7 @@ const translations = {
     'edit_user': 'Edit User',
     'delete_user': 'Delete User',
     'out_of_stock': 'Out of Stock',
+    'unavailable_for_purchase': 'Unavailable for Purchase',
     'in_stock': 'In Stock',
     'low_stock': 'Low Stock',
     'edit_product': 'Edit Product',
@@ -246,6 +247,9 @@ const translations = {
     'security': 'Security',
     'manage_your_account_security': 'Manage your account security',
     'order_history': 'Order History',
+    'show_more_orders': 'Show More Orders',
+    'show_less': 'Show Less',
+    'more': 'more',
     'show_more': 'Show More',
     'showing': 'Showing',
     'of': 'of',
@@ -525,6 +529,7 @@ const translations = {
     'edit_user': 'Modifier l\'utilisateur',
     'delete_user': 'Supprimer l\'utilisateur',
     'out_of_stock': 'Rupture de stock',
+    'unavailable_for_purchase': 'Indisponible pour l\'achat',
     'in_stock': 'En stock',
     'low_stock': 'Stock faible',
     'edit_product': 'Modifier le produit',
@@ -591,6 +596,9 @@ const translations = {
     'security': 'Sécurité',
     'manage_your_account_security': 'Gérer la sécurité de votre compte',
     'order_history': 'Historique des Commandes',
+    'show_more_orders': 'Afficher Plus de Commandes',
+    'show_less': 'Afficher Moins',
+    'more': 'de plus',
     'show_more': 'Afficher Plus',
     'showing': 'Affichage',
     'of': 'sur',
@@ -884,6 +892,7 @@ const translations = {
     'edit_user': 'تعديل المستخدم',
     'delete_user': 'حذف المستخدم',
     'out_of_stock': 'نفذ من المخزون',
+    'unavailable_for_purchase': 'غير متوفر للشراء',
     'in_stock': 'متوفر في المخزون',
     'low_stock': 'مخزون منخفض',
     'edit_product': 'تعديل المنتج',
@@ -896,7 +905,9 @@ const translations = {
     'no_orders_found': 'لم يتم العثور على طلبات',
     'get_started_add_order': 'ستظهر الطلبات هنا عندما يبدأ العملاء في تقديمها.',
     'payment_successful': 'تم الدفع بنجاح!',
-    'payment_success_message': 'شكراً لشرائك. تم معالجة دفعتك بنجاح. سنرسل لك تأكيداً بالبريد الإلكتروني مع تفاصيل طلبك قريباً.',
+    'payment_success_message': 'تمت معالجة دفعتك بنجاح. شكراً لك على الشراء!',
+    'order_confirmed': 'تم تأكيد الطلب',
+    'order_confirmation_message': 'تم تأكيد طلبك وسيتم معالجته قريباً. ستتلقى تأكيداً بالبريد الإلكتروني مع تفاصيل الطلب.',
     'return_to_home': 'العودة إلى الرئيسية',
     'view_order_status': 'عرض حالة الطلب',
     'payment_error': 'خطأ في الدفع',
@@ -950,6 +961,9 @@ const translations = {
     'security': 'الأمان',
     'manage_your_account_security': 'إدارة أمان حسابك',
     'order_history': 'سجل الطلبات',
+    'show_more_orders': 'عرض المزيد من الطلبات',
+    'show_less': 'عرض أقل',
+    'more': 'أخرى',
     'show_more': 'عرض المزيد',
     'showing': 'عرض',
     'of': 'من',
@@ -1083,7 +1097,7 @@ const translations = {
 };
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<Language>('en');
+  const [language, setLanguageState] = useState<Language>('fr');
 
   useEffect(() => {
     // Load saved language from localStorage

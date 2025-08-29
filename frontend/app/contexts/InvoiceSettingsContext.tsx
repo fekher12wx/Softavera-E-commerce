@@ -29,20 +29,18 @@ interface InvoiceSettingsContextType {
 }
 
 const defaultSettings: InvoiceSettings = {
-  companyName: 'E-Shop',
-  companyTagline: 'Your Trusted Online Store',
-  companyEmail: 'contact@e-shop.com',
-  companyWebsite: 'e-shop.com',
-  companyAddress: '123 Business Street',
-  companyCity: 'Tunis',
-  companyCountry: 'Tunisia',
-  companyPhone: '+216 71 234 567',
-  paymentText: 'Payment to E-Shop',
+  companyName: 'Softavera',
+  companyAddress: '123 Business Street, City, Country',
+  companyEmail: 'contact@softavera.com',
+  companyWebsite: 'softavera.com',
+  companyPhone: '+1 234 567 8900',
+  paymentText: 'Payment to Softavera',
+  invoicePrefix: 'INV',
+  taxRate: 10,
+  currency: 'USD',
   logoUrl: '',
-  primaryColor: '#8B5CF6',
-  secondaryColor: '#EC4899',
-  accentColor: '#3B82F6',
-  fiscalInformation: ''
+  termsAndConditions: 'Standard terms and conditions apply.',
+  footerText: 'Thank you for choosing Softavera!'
 };
 
 const InvoiceSettingsContext = createContext<InvoiceSettingsContextType | undefined>(undefined);

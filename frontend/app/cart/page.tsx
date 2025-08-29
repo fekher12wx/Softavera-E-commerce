@@ -16,6 +16,7 @@ import AdyenDropin from '../../components/AdyenDropin';
 import PaymeePayment from '../../components/PaymeePayment';
 import KonnectPayment from '../../components/KonnectPayment';
 import Header from '../../components/Header';
+import { useRouter } from 'next/navigation';
 
 // Payment status components
 const PaymentSuccess = ({ onClose }: { onClose: () => void }) => {
@@ -92,10 +93,12 @@ const PaymentError = ({ onRetry }: { onRetry: () => void }) => {
 };
 
 const Cart: React.FC = () => {
-  const { cart, removeFromCart, updateQuantity, clearCart, total, totalWithTax } = useCart();
-  const { convertPrice, getCurrencySymbol } = useCurrency();
-  const { defaultTax, calculateTax } = useTax();
   const { t } = useLanguage();
+  const router = useRouter();
+  const { cart, removeFromCart, updateQuantity, clearCart, total, totalWithTax } = useCart();
+  const { convertProductPrice, getCurrencySymbol } = useCurrency();
+  const { defaultTax, calculateTax } = useTax();
+  const { isLoggedIn, user } = useAuth();
   const [showPayment, setShowPayment] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [clientKey, setClientKey] = useState<string>("");
@@ -103,9 +106,7 @@ const Cart: React.FC = () => {
   const [sessionError, setSessionError] = useState<string | null>(null);
 
   const [shippingAddress, setShippingAddress] = useState<Address | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userAddress, setUserAddress] = useState<Address | null>(null);
-  const [user, setUser] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'error' | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'adyen' | 'paymee' | 'konnect' | null>(null);
@@ -149,7 +150,7 @@ const Cart: React.FC = () => {
       try {
         const token = localStorage.getItem('authToken');
         if (!token) {
-          setIsLoggedIn(false);
+          // setIsLoggedIn(false); // This state is now managed by useAuth
           setUserAddress(null);
           return;
         }
@@ -162,15 +163,14 @@ const Cart: React.FC = () => {
         });
         if (response.ok) {
           const userData = await response.json();
-          setIsLoggedIn(true);
-          setUser(userData);
+          // setIsLoggedIn(true); // This state is now managed by useAuth
           setUserAddress(userData.address || null); // Use the full address object
         } else {
-          setIsLoggedIn(false);
+          // setIsLoggedIn(false); // This state is now managed by useAuth
           setUserAddress(null);
         }
       } catch (error) {
-        setIsLoggedIn(false);
+        // setIsLoggedIn(false); // This state is now managed by useAuth
         setUserAddress(null);
       }
     };
@@ -437,6 +437,7 @@ const Cart: React.FC = () => {
 
       toast.success(t('order_created_successfully'));
       clearCart();
+      router.push('/result/success'); // Redirect to success page
     } catch (err) {
       toast.error(t('failed_to_create_order'));
     }
@@ -609,7 +610,7 @@ if (cart.length === 0) {
                         <div>
                           <h2 className="text-xl font-bold text-gray-800 mb-2">{item.product.name}</h2>
                           <p className="text-gray-600 font-medium">
-                            💰 {convertPrice(item.product.price).toFixed(3)} {getCurrencySymbol()}
+                            💰 {convertProductPrice(item.product.price).toFixed(3)} {getCurrencySymbol()}
                           </p>
                         </div>
                       </div>
@@ -633,7 +634,7 @@ if (cart.length === 0) {
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
-                            {convertPrice(item.product.price * item.quantity).toFixed(3)} {getCurrencySymbol()}
+                            {convertProductPrice(item.product.price * item.quantity).toFixed(3)} {getCurrencySymbol()}
                           </p>
                           <button
                             onClick={() => removeFromCart(item.product.id)}
@@ -675,7 +676,7 @@ if (cart.length === 0) {
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">{t('subtotal')}:</span>
-                    <span className="font-semibold text-gray-800">{convertPrice(total).toFixed(3)} {getCurrencySymbol()}</span>
+                    <span className="font-semibold text-gray-800">{convertProductPrice(total).toFixed(3)} {getCurrencySymbol()}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">{t('shipping')}:</span>
@@ -683,13 +684,13 @@ if (cart.length === 0) {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">{t('tax')}:</span>
-                    <span className="font-semibold text-gray-800">{convertPrice(totalWithTax - total).toFixed(3)} {getCurrencySymbol()}</span>
+                    <span className="font-semibold text-gray-800">{convertProductPrice(totalWithTax - total).toFixed(3)} {getCurrencySymbol()}</span>
                   </div>
                   <hr className="border-gray-300" />
                   <div className="flex justify-between items-center text-xl">
                     <span className="font-bold text-gray-800">{t('total')} (with tax):</span>
                     <span className="font-bold text-2xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      {convertPrice(totalWithTax).toFixed(3)} {getCurrencySymbol()}
+                      {convertProductPrice(totalWithTax).toFixed(3)} {getCurrencySymbol()}
                     </span>
                   </div>
                 </div>
@@ -836,12 +837,7 @@ if (cart.length === 0) {
                     )}
                   </div>
 
-                  <Link
-                    href="/"
-                    className="block w-full text-center bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-4 rounded-xl font-bold hover:from-gray-600 hover:to-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                  >
-                    🔙 {t('continue_shopping')}
-                  </Link>
+
                 </div>
                 <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
                   <div className="text-sm text-gray-700">

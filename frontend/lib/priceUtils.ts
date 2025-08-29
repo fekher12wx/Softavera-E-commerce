@@ -122,3 +122,41 @@ export function logPriceCalculation(
   breakdown: PriceBreakdown | ReturnType<typeof calculateCartTotals>
 ): void {
 }
+
+/**
+ * Convert product price from base currency to selected currency
+ * This function should be used in components that need to display prices
+ * @param price - The price in base currency
+ * @param exchangeRate - The exchange rate from base to selected currency
+ * @returns The converted price
+ */
+export function convertProductPrice(price: number, exchangeRate: number): number {
+  return Math.round(price * exchangeRate * 100) / 100;
+}
+
+/**
+ * Calculate price with tax and convert to selected currency
+ * @param basePrice - The base price in base currency
+ * @param taxRate - The tax rate percentage
+ * @param exchangeRate - The exchange rate from base to selected currency
+ * @returns Object with converted prices
+ */
+export function calculatePriceWithTaxAndCurrency(
+  basePrice: number,
+  taxRate: number,
+  exchangeRate: number
+): {
+  convertedBasePrice: number;
+  convertedTaxAmount: number;
+  convertedTotalWithTax: number;
+} {
+  const convertedBasePrice = convertProductPrice(basePrice, exchangeRate);
+  const convertedTaxAmount = convertProductPrice(basePrice * (taxRate / 100), exchangeRate);
+  const convertedTotalWithTax = convertedBasePrice + convertedTaxAmount;
+  
+  return {
+    convertedBasePrice,
+    convertedTaxAmount,
+    convertedTotalWithTax
+  };
+}

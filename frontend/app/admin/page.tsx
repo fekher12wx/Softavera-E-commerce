@@ -29,7 +29,7 @@ import CustomToast from '../../components/CustomToast';
 
 const AdminDashboard: React.FC = () => {
   // All hooks at the top!
-  const { getCurrencySymbol, refreshBaseCurrency, updateBaseCurrency } = useCurrency();
+  const { getCurrencySymbol, refreshBaseCurrency, updateBaseCurrency, convertProductPrice } = useCurrency();
   const { t } = useLanguage();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('users');
@@ -415,7 +415,7 @@ const AdminDashboard: React.FC = () => {
         setError(`Cannot delete user: User with ID ${id} not found in backend`);
         return;
       }
-    } else if (activeTab === 'settings' && activeSettingsSubTab === 'currencies') {
+    } else if (activeTab === 'customize' && activeSettingsSubTab === 'currencies') {
       // For currencies, just check if ID is valid UUID format
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(id)) {
@@ -452,7 +452,7 @@ const AdminDashboard: React.FC = () => {
       const endpoint = activeTab === 'users' ? 'users' : 
                       activeTab === 'products' ? 'products' : 
                       activeTab === 'orders' ? 'orders' : 
-                      activeTab === 'settings' ? 
+                      activeTab === 'customize' ? 
                         (activeSettingsSubTab === 'taxes' ? 'taxes' :
                          activeSettingsSubTab === 'paymentMethods' ? 'payment-methods' :
                          activeSettingsSubTab === 'currencies' ? 'currencies' : 'users') : 'users';
@@ -489,7 +489,7 @@ const AdminDashboard: React.FC = () => {
             if (activeTab === 'users') {
               setUsers(users.filter(user => user.id !== id));
               toast.success('User removed from list (was already deleted)');
-            } else if (activeTab === 'settings' && activeSettingsSubTab === 'currencies') {
+            } else if (activeTab === 'customize' && activeSettingsSubTab === 'currencies') {
               setCurrencies(currencies.filter(currency => currency.id !== id));
               toast.success('Currency removed from list (was already deleted)');
             }
@@ -550,7 +550,7 @@ const AdminDashboard: React.FC = () => {
       } else if (activeTab === 'orders') {
         setOrders(orders.filter(order => order.id !== id));
         toast.success('Order deleted successfully!');
-      } else if (activeTab === 'settings') {
+              } else if (activeTab === 'customize') {
         if (activeSettingsSubTab === 'taxes') {
           setTaxes(taxes.filter(tax => tax.id !== id));
           toast.success('Tax deleted successfully!');
@@ -1028,11 +1028,31 @@ const AdminDashboard: React.FC = () => {
         
         const response = await fetch(url, {
           method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify(productData),
         });
 
+        // Check if the response is successful
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Product update failed:', errorData);
+          toast.error(`Failed to ${modalType} product: ${errorData.error || `HTTP ${response.status}`}`);
+          return;
+        }
+
         updatedItem = await response.json();
+        
+        // Check if the response contains an error
+        if ((updatedItem as any).error) {
+          console.error('Product update error in response:', updatedItem);
+          toast.error(`Failed to ${modalType} product: ${(updatedItem as any).error}`);
+          return;
+        }
+        
+        console.log('Product update response:', updatedItem);
   
      
         if (imageFile && updatedItem.id) {
@@ -1056,7 +1076,7 @@ const AdminDashboard: React.FC = () => {
           toast.success(`Product "${(updatedItem as Product).name || 'Product'}" updated successfully!`);
         }
   
-      } else if ((activeTab === 'settings' && activeSettingsSubTab === 'taxes') || modalType === 'add-tax') {
+      } else if ((activeTab === 'customize' && activeSettingsSubTab === 'taxes') || modalType === 'add-tax') {
         // Tax management
         
         // Prepare tax data - only send rate and isActive
@@ -1119,7 +1139,7 @@ const AdminDashboard: React.FC = () => {
             // Silent error handling
           }
         }
-      } else if (activeTab === 'settings' && activeSettingsSubTab === 'paymentMethods') {
+      } else if (activeTab === 'customize' && activeSettingsSubTab === 'paymentMethods') {
         // Payment Method management
         
         const paymentMethodData = {
@@ -1181,7 +1201,7 @@ const AdminDashboard: React.FC = () => {
           setPaymentMethods(paymentMethods.map(pm => pm.id === updatedItem.id ? updatedItem as PaymentMethod : pm));
           toast.success(`Payment method "${(updatedItem as PaymentMethod).name}" updated successfully!`);
         }
-      } else if (activeTab === 'settings' && activeSettingsSubTab === 'currencies') {
+      } else if (activeTab === 'customize' && activeSettingsSubTab === 'currencies') {
         // Currency management
         const currencyData = {
           name: formData.name,
@@ -1312,19 +1332,57 @@ const AdminDashboard: React.FC = () => {
 
         const response = await fetch(url, {
           method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(payload),
         });
-  
+
         updatedItem = await response.json();
-  
+
         if (activeTab === 'users') {
-          setUsers(modalType === 'add'
-            ? [...users, updatedItem as User]
-            : users.map(user => user.id === updatedItem.id ? updatedItem as User : user));
+          // Get user name with fallback - check multiple possible field names and structures
+          let userName = 'Unknown User';
+          
+          if (updatedItem) {
+            // Check if updatedItem is the user directly
+            if ((updatedItem as User)?.name) {
+              userName = (updatedItem as User).name;
+            }
+            // Check if updatedItem has a nested user object
+            else if ((updatedItem as any)?.user?.name) {
+              userName = (updatedItem as any).user.name;
+            }
+            // Check for alternative field names
+            else if ((updatedItem as any)?.nom) {
+              userName = (updatedItem as any).nom;
+            }
+            else if ((updatedItem as any)?.userName) {
+              userName = (updatedItem as any).userName;
+            }
+            // Check if it's a string (direct name)
+            else if (typeof updatedItem === 'string') {
+              userName = updatedItem;
+            }
+          }
+          
+          // Final fallback: if we still don't have a name, try to get it from the existing users array
+          if (userName === 'Unknown User' && updatedItem?.id) {
+            const existingUser = users.find(u => u.id === updatedItem.id);
+            if (existingUser?.name) {
+              userName = existingUser.name;
+            }
+          }
+          
+          setUsers(prevUsers => {
+            const newUsers = modalType === 'add'
+              ? [...prevUsers, updatedItem as User]
+              : prevUsers.map(user => user.id === updatedItem.id ? updatedItem as User : user);
+            
+            return newUsers;
+          });
+          
           toast.success(modalType === 'add' 
-            ? `User "${(updatedItem as User).name}" created successfully!`
-            : `User "${(updatedItem as User).name}" updated successfully!`);
+            ? `User "${userName}" created successfully!`
+            : `User "${userName}" updated successfully!`);
         } else if (activeTab === 'orders') {
           setOrders(modalType === 'add'
             ? [...orders, updatedItem as Order]
@@ -1374,14 +1432,27 @@ const AdminDashboard: React.FC = () => {
               <h1 className="text-2xl font-bold text-white">Currencies</h1>
               <p className="text-indigo-100 mt-1">Manage your store currencies and exchange rates</p>
             </div>
-            {currencies.find(c => c.isBase) && (
-              <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm text-white border border-white/30">
-                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                </svg>
-                Base: {currencies.find(c => c.isBase)?.code}
-              </span>
-            )}
+            <div className="flex items-center space-x-3">
+              {currencies.find(c => c.isBase) && (
+                <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm text-white border border-white/30">
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                  </svg>
+                  Base: {currencies.find(c => c.isBase)?.code}
+                </span>
+              )}
+              <button 
+                onClick={() => {
+                  setModalType('add');
+                  setSelectedItem(null);
+                  setShowModal(true);
+                }}
+                className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all border border-white/20"
+              >
+                <Plus className="w-4 h-4" />
+                Add Currency
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1817,7 +1888,7 @@ const AdminDashboard: React.FC = () => {
                           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                           </svg>
-                          <span className="font-bold text-lg text-gray-900">{product.price}</span>
+                          <span className="font-bold text-lg text-gray-900">{getCurrencySymbol()}{convertProductPrice(product.price).toFixed(3)}</span>
                         </div>
                       </td>
   
@@ -2184,7 +2255,7 @@ const AdminDashboard: React.FC = () => {
               handleDelete={handleDelete}
             />
           )}
-          {activeTab === 'settings' && (
+          {activeTab === 'customize' && (
             <>
               <SettingsTabBar 
                 activeSettingsSubTab={activeSettingsSubTab} 
@@ -2199,7 +2270,12 @@ const AdminDashboard: React.FC = () => {
                   searchTerm={searchTerm} 
                   handleView={handleView} 
                   handleEdit={handleEdit} 
-                  handleDelete={handleDelete} 
+                  handleDelete={handleDelete}
+                  onAddNew={() => {
+                    setModalType('add');
+                    setSelectedItem(null);
+                    setShowModal(true);
+                  }}
                 />
               )}
 
@@ -2231,14 +2307,27 @@ const AdminDashboard: React.FC = () => {
                           <h1 className="text-2xl font-bold text-white">Currencies</h1>
                           <p className="text-indigo-100 mt-1">Manage your store currencies and exchange rates</p>
                         </div>
-                        {currencies.find(c => c.isBase) && (
-                          <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm text-white border border-white/30">
-                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                            </svg>
-                            Base: {currencies.find(c => c.isBase)?.code}
-                          </span>
-                        )}
+                        <div className="flex items-center space-x-3">
+                          {currencies.find(c => c.isBase) && (
+                            <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm text-white border border-white/30">
+                              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                              </svg>
+                              Base: {currencies.find(c => c.isBase)?.code}
+                            </span>
+                          )}
+                          <button 
+                            onClick={() => {
+                              setModalType('add');
+                              setSelectedItem(null);
+                              setShowModal(true);
+                            }}
+                            className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all border border-white/20"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Add Currency
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -82,28 +82,29 @@ const Header: React.FC = () => {
             const data = await response.json();
             setUser(data.user);
           } else {
-            handleLogout();
-            toast.error('Session expired, please log in again.');
-            setTimeout(() => {
-              window.location.reload();
-            }, 1500);
+            // Session expired - automatically log out
+            handleSessionExpired();
             return;
           }
         }
       } catch (error) {
         console.error('Auth check failed:', error);
-        handleLogout();
-        toast.error('Session expired, please log in again.');
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
+        // Network error - automatically log out
+        handleSessionExpired();
         return;
       } finally {
         setIsAuthLoading(false);
       }
     };
 
+    // Check auth status on mount
     checkAuthStatus();
+
+    // Set up periodic session check every 5 minutes
+    const intervalId = setInterval(checkAuthStatus, 5 * 60 * 1000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -125,15 +126,19 @@ const Header: React.FC = () => {
           localStorage.setItem('authToken', data.token);
         }
         
-        toast.success(`${t('welcome')} ${data.user?.name || email.split('@')[0]}!`);
+        // Set user state immediately for smooth transition
         setUser(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));
+        
+        // Close modal and clear form
         setShowAuth(false);
         setEmail('');
         setPassword('');
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+        
+        // Show success message
+        toast.success(`${t('welcome')} ${data.user?.name || email.split('@')[0]}!`);
+        
+        // No page refresh - smooth transition
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Login error');
@@ -199,16 +204,50 @@ const Header: React.FC = () => {
   };
 
   const handleLogout = () => {
+    // Clear all authentication data
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+    
+    // Update UI state immediately for smooth transition
     setUser(null);
     setShowUserMenu(false);
-    clearCart(); // Clear the cart when logging out
+    
+    // Clear cart when logging out
+    clearCart();
+    
+    // Show success message
     toast.success(t('logout_success'));
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000);
-    // No page reload
+    
+    // No page refresh - smooth transition
+  };
+
+  // Handle session expiration automatically
+  const handleSessionExpired = () => {
+    // Immediately clear all authentication state
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    
+    // Update UI state immediately
+    setUser(null);
+    setShowUserMenu(false);
+    setShowAuth(false);
+    
+    // Clear cart
+    clearCart();
+    
+    // Show notification
+    toast.error('Session expired, please log in again.');
+    
+    // No page refresh - smooth transition
+  };
+
+  // Utility function to check if a response indicates expired token
+  const checkTokenExpiry = (response: Response) => {
+    if (response.status === 401) {
+      handleSessionExpired();
+      return true;
+    }
+    return false;
   };
 
   const getPasswordStrength = (password: string) => {

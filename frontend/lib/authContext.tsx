@@ -6,6 +6,10 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  address?: any;
   // Add other fields as needed
 }
 
@@ -13,6 +17,7 @@ interface AuthContextType {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => void;
   loading: boolean;
+  isLoggedIn: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,7 +41,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      setUser, 
+      loading, 
+      isLoggedIn: !!user 
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -52,7 +52,7 @@ const SettingsTabBar: React.FC<SettingsTabBarProps> = ({
     <div className="mb-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">Settings</h2>
+        <h2 className="text-2xl font-semibold text-gray-900">Customize</h2>
         <div className="h-px flex-1 bg-gray-200" />
       </div>
       

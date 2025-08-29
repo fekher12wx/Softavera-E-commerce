@@ -16,7 +16,7 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart } = useCart();
-  const { convertPrice, getCurrencySymbol, baseCurrency } = useCurrency();
+  const { convertProductPrice, getCurrencySymbol, baseCurrency } = useCurrency();
   const { t } = useLanguage();
   const { getTaxById, calculateTax } = useTax();
   const { user } = useAuth();
@@ -33,10 +33,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const [hasPurchasedModal, setHasPurchasedModal] = useState(false);
   const [loadingHasPurchased, setLoadingHasPurchased] = useState(false);
 
+  // Debug stock values
+  useEffect(() => {
+    console.log(`Product: ${product.name}, Stock: ${product.stock}, Type: ${typeof product.stock}, Disabled: ${product.stock <= 0}`);
+  }, [product.stock, product.name]);
+
   // Calculate tax details - use database tax rate if available, fallback to tax context
   const taxRate = (product as any).taxRate || (product.taxId ? getTaxById(product.taxId)?.rate : 0) || 0;
-  const basePrice = convertPrice(product.price);
-  const totalWithTax = convertPrice(product.price * (1 + taxRate / 100));
+  const basePrice = convertProductPrice(product.price);
+  const totalWithTax = convertProductPrice(product.price * (1 + taxRate / 100));
   const taxAmount = totalWithTax - basePrice;
 
   // Fetch reviews
@@ -179,23 +184,28 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       <div className="group relative bg-white rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-105 overflow-hidden border border-gray-100 hover:border-purple-200 flex flex-col">
         {/* Product Image */}
         <div className="relative overflow-hidden h-56 flex flex-col items-center justify-start bg-gradient-to-br from-purple-50 to-pink-50">
-          <img 
-            src={`http://localhost:3001/uploads/${product.image}`} 
-            alt={product.name} 
-            className="object-contain h-40 transition-transform duration-500 group-hover:scale-110 drop-shadow-xl mt-4" 
-          />
-          {/* Stock Badge */}
-          <div className="absolute top-4 right-4">
-            {product.stock > 0 ? (
+          <div className="relative w-full h-40 mt-4">
+            <img 
+              src={`http://localhost:3001/uploads/${product.image}`} 
+              alt={product.name} 
+              className="object-contain h-40 transition-transform duration-500 group-hover:scale-110 drop-shadow-xl" 
+            />
+            
+            {/* Out of Stock Overlay in Center */}
+            {product.stock <= 0 && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">{t('out_of_stock')}</span>
+              </div>
+            )}
+          </div>
+          {/* Stock Badge - Only show for in-stock items */}
+          {product.stock > 0 && (
+            <div className="absolute top-4 right-4">
               <span className="text-xs px-3 py-1 rounded-full bg-green-100 text-green-700 font-semibold backdrop-blur-sm shadow">
                 {product.stock} {t('left')}
               </span>
-            ) : (
-              <span className="text-xs px-3 py-1 rounded-full bg-red-100 text-red-700 font-semibold backdrop-blur-sm shadow">
-                {t('out_of_stock')}
-              </span>
-            )}
-          </div>
+            </div>
+          )}
           {/* Reviews Section */}
           <div className="w-full px-4 mt-2">
             <div className="bg-white rounded-xl shadow p-3">
@@ -239,7 +249,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={product.stock === 0 || quantity <= 1}
+                  disabled={product.stock <= 0 || quantity <= 1}
                   className="px-3 py-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   -
@@ -251,11 +261,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                   value={quantity}
                   onChange={e => setQuantity(Math.max(1, Math.min(product.stock, Number(e.target.value))))}
                   className="w-12 px-2 py-2 text-center border-0 bg-transparent focus:outline-none focus:ring-0 font-semibold text-gray-800 appearance-none hide-number-spin"
-                  disabled={product.stock === 0}
+                  disabled={product.stock <= 0}
                 />
                 <button
                   onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  disabled={product.stock === 0 || quantity >= product.stock}
+                  disabled={product.stock <= 0 || quantity >= product.stock}
                   className="px-3 py-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   +
@@ -269,12 +279,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                     addToCart({ product, quantity });
                   }
                 }}
-                disabled={product.stock === 0}
+                disabled={product.stock <= 0}
                 className={`flex-1 bg-white border-2 border-purple-600 text-purple-600 px-4 py-2 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-sm hover:shadow-md
                   hover:bg-purple-600 hover:text-white
-                  ${product.stock === 0 ? 'opacity-50 cursor-not-allowed border-gray-300 text-gray-400' : ''}`}
+                  ${product.stock <= 0 ? 'opacity-50 cursor-not-allowed border-gray-300 text-gray-400 hover:bg-white hover:text-gray-400' : ''}`}
               >
-                🛒 {t('add')}
+                {product.stock <= 0 ? t('out_of_stock') : `🛒 ${t('add')}`}
               </button>
             </div>
           </div>
@@ -308,23 +318,29 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               <div className="grid md:grid-cols-2 gap-8">
                 {/* Product Image */}
                 <div className="relative flex flex-col">
-                  <img 
-                    src={`http://localhost:3001/uploads/${product.image}`} 
-                    alt={product.name} 
-                    className="w-full h-80 object-cover rounded-2xl shadow-lg" 
-                  />
-                  {/* Stock Badge */}
-                  <div className="absolute top-4 right-4">
-                    {product.stock > 0 ? (
+                  <div className="relative w-full h-80 overflow-hidden rounded-2xl">
+                    <img 
+                      src={`http://localhost:3001/uploads/${product.image}`} 
+                      alt={product.name} 
+                      className="w-full h-full object-cover rounded-2xl shadow-lg" 
+                    />
+                    
+                    {/* Out of Stock Overlay in Center */}
+                    {product.stock <= 0 && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-2xl">
+                        <span className="text-white font-bold text-2xl">{t('out_of_stock')}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Stock Badge - Only show for in-stock items */}
+                  {product.stock > 0 && (
+                    <div className="absolute top-4 right-4">
                       <span className="text-sm px-4 py-2 rounded-full bg-green-100 text-green-700 font-semibold backdrop-blur-sm">
                         {product.stock} {t('in_stock_count')}
                       </span>
-                    ) : (
-                      <span className="text-sm px-4 py-2 rounded-full bg-red-100 text-red-700 font-semibold backdrop-blur-sm">
-                        {t('out_of_stock')}
-                      </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   
                   {/* Reviews Section (modal) */}
                   <div className="w-full px-1 mt-4">
@@ -402,7 +418,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                       <div className="flex items-center bg-white rounded-xl border border-gray-200 overflow-hidden">
                         <button
                           onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          disabled={product.stock === 0 || quantity <= 1}
+                          disabled={product.stock <= 0 || quantity <= 1}
                           className="px-3 py-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           -
@@ -414,11 +430,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                           value={quantity}
                           onChange={e => setQuantity(Math.max(1, Math.min(product.stock, Number(e.target.value))))}
                           className="w-16 px-2 py-2 text-center border-0 bg-transparent focus:outline-none focus:ring-0 font-semibold text-gray-800 appearance-none hide-number-spin"
-                          disabled={product.stock === 0}
+                          disabled={product.stock <= 0}
                         />
                         <button
                           onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                          disabled={product.stock === 0 || quantity >= product.stock}
+                          disabled={product.stock <= 0 || quantity >= product.stock}
                           className="px-3 py-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           +
@@ -432,12 +448,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                           setShowToast(true);
                         }
                       }}
-                      disabled={product.stock === 0}
+                      disabled={product.stock <= 0}
                       className={`w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl
                         hover:from-purple-700 hover:to-pink-700
-                        ${product.stock === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        ${product.stock <= 0 ? 'opacity-50 cursor-not-allowed bg-gray-400 hover:bg-gray-400 hover:from-gray-400 hover:to-gray-400' : ''}`}
                     >
-                      🛒 {t('add_to_cart_quantity')} ({quantity})
+                      {product.stock <= 0 ? t('out_of_stock') : `🛒 ${t('add_to_cart_quantity')} (${quantity})`}
                     </button>
                   </div>
                 </div>

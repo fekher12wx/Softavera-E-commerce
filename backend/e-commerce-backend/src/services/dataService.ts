@@ -113,6 +113,21 @@ export class DatabaseService {
     return result.rows.map(this.mapProductRowWithTax);
   }
 
+  // Get products by subcategory
+  async getProductsBySubcategory(subcategory: string): Promise<ProductWithTax[]> {
+    const result = await pool.query(`
+      SELECT 
+        p.*,
+        t.rate as tax_rate,
+        t.name as tax_name
+      FROM products p
+      LEFT JOIN taxes t ON p.tax_id = t.id
+      WHERE p.subcategory ILIKE $1 
+      ORDER BY p.created_at DESC
+    `, [`%${subcategory}%`]);
+    return result.rows.map(this.mapProductRowWithTax);
+  }
+
   // Get products by category and subcategory
   async getProductsByCategoryAndSubcategory(category: string, subcategory: string): Promise<ProductWithTax[]> {
     const result = await pool.query(`
@@ -282,6 +297,12 @@ export class DatabaseService {
         updateFields.city = address.city;
         updateFields.zip_code = address.zipCode;
         updateFields.country = address.country;
+        
+        // Remove any flat address fields to prevent duplication
+        delete updateFields.street;
+        delete updateFields.city;
+        delete updateFields.zip_code;
+        delete updateFields.country;
       }
 
       // Build the SET clause
@@ -304,10 +325,8 @@ export class DatabaseService {
         UPDATE users 
         SET ${setClauses.join(', ')} 
         WHERE id = $${paramCount + 1}
-        RETURNING id, email, name, role, street, city, zip_code, country, created_at, updated_at
+        RETURNING *
       `;
-
-      
 
       const result = await pool.query(query, values);
       
@@ -316,6 +335,7 @@ export class DatabaseService {
       }
 
       const updatedUser = this.mapUserRow(result.rows[0]);
+      
       return updatedUser;
     } catch (error) {
       console.error('Error updating user:', error);
@@ -1374,7 +1394,7 @@ export class DatabaseService {
     const user: User = {
       id: row.id,
       email: row.email,
-      name: row.name,
+      name: row.name || row.nom || 'Unknown Name', // Fallback for name field
       role: row.role,
       createdAt: row.created_at,
       updatedAt: row.updated_at
@@ -1388,7 +1408,7 @@ export class DatabaseService {
         country: row.country || ''
       };
     }
-
+    
     return user;
   }
 

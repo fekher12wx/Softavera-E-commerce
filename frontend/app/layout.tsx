@@ -9,8 +9,8 @@ import './adyen.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'E-Shop - Your Online Store',
-  description: 'Best deals on electronics and more',
+  title: 'Softavera - Your Online Store',
+  description: 'Discover amazing products at Softavera',
 };
 
 export default function RootLayout({

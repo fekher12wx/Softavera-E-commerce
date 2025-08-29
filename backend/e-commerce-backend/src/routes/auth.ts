@@ -1,6 +1,6 @@
 import express from 'express';
 import authController from '../controllers/authController';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireAdminAuth } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -14,6 +14,7 @@ router.get('/verify', requireAuth, authController.verify.bind(authController)); 
 router.get('/profile', requireAuth, authController.getProfile.bind(authController));
 router.put('/profile', requireAuth, authController.updateProfile.bind(authController));
 router.put('/change-password', requireAuth, authController.changePassword.bind(authController));
+router.put('/user-role', requireAdminAuth, authController.updateUserRole.bind(authController)); // 🆕 NEW - Admin only
 router.post('/logout', requireAuth, authController.logout.bind(authController)); // 🆕 NEW (optional)
 
 export default router;

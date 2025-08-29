@@ -18,7 +18,7 @@ const OrdersCard: React.FC<OrdersCardProps> = ({
   getImageUrl,
   onCancelOrder,
 }) => {
-  const { convertPrice, getCurrencySymbol } = useCurrency();
+  const { convertProductPrice, getCurrencySymbol } = useCurrency();
   const { t } = useLanguage();
   
   if (loading) {
@@ -137,7 +137,7 @@ const OrdersCard: React.FC<OrdersCardProps> = ({
                     </p>
                   </div>
                   <p className="text-sm font-medium text-gray-800">
-                    {convertPrice(item.product.price * item.quantity).toFixed(3)} {getCurrencySymbol()}
+                    {convertProductPrice(item.product.price * item.quantity).toFixed(3)} {getCurrencySymbol()}
                   </p>
                 </div>
               ))}
@@ -145,7 +145,7 @@ const OrdersCard: React.FC<OrdersCardProps> = ({
 
             <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
               <span className="text-gray-600">{t('total')}</span>
-              <span className="font-semibold text-gray-800">{convertPrice(order.total).toFixed(3)} {getCurrencySymbol()}</span>
+              <span className="font-semibold text-gray-800">{convertProductPrice(order.total).toFixed(3)} {getCurrencySymbol()}</span>
               {onCancelOrder && order.status !== 'cancelled' && order.status !== 'delivered' && (
                 <button
                   onClick={() => onCancelOrder(order.id)}

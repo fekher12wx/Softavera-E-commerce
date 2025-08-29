@@ -1,10 +1,11 @@
 import React from 'react';
 import { Users, Package, ShoppingCart, DollarSign } from 'lucide-react';
-import { CURRENCY_SYMBOL } from '../../lib/constants';
+import { useCurrency } from '../../lib/currencyContext';
 import { useLanguage } from '../../lib/languageContext';
 
 const StatsCards = ({ users, products, orders, totalRevenue }: any) => {
   const { t } = useLanguage();
+  const { getCurrencySymbol, convertProductPrice } = useCurrency();
   
   // Ensure arrays are always arrays to prevent runtime errors
   const safeUsers = Array.isArray(users) ? users : [];
@@ -54,7 +55,7 @@ const StatsCards = ({ users, products, orders, totalRevenue }: any) => {
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold text-white">
-              {safeTotalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + CURRENCY_SYMBOL}
+              {convertProductPrice(safeTotalRevenue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + getCurrencySymbol()}
             </p>
             <p className="text-xs text-white/80 mt-1">{t('total_revenue')}</p>
           </div>

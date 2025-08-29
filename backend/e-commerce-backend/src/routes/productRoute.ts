@@ -11,6 +11,11 @@ router.get('/', productController.getAllProducts);
 // GET /api/products/category/:category
 router.get('/category/:category', productController.getProductsByCategory);
 
+// GET /api/products/subcategory/:subcategory
+router.get('/subcategory/:subcategory', productController.getProductsBySubcategory);
+
+// GET /api/products/category/:category/subcategory/:subcategory
+router.get('/category/:category/subcategory/:subcategory', productController.getProductsByCategoryAndSubcategory);
 
 // GET /api/products/:id
 router.get('/:id', productController.getProductById);

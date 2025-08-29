@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Edit, Trash2, Percent, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
+import { Eye, Edit, Trash2, Percent, CheckCircle, XCircle, ChevronDown, Plus } from 'lucide-react';
 import { Tax } from './adminTypes';
 import { useLanguage } from '../../lib/languageContext';
 
@@ -9,6 +9,7 @@ interface TaxesTableProps {
   handleView: (tax: Tax) => void;
   handleEdit: (tax: Tax) => void;
   handleDelete: (id: string) => void;
+  onAddNew?: () => void;
 }
 
 const TaxesTable: React.FC<TaxesTableProps> = ({
@@ -17,6 +18,7 @@ const TaxesTable: React.FC<TaxesTableProps> = ({
   handleView,
   handleEdit,
   handleDelete,
+  onAddNew,
 }) => {
   const { t } = useLanguage();
   const [itemsPerPage, setItemsPerPage] = useState(15);
@@ -49,19 +51,28 @@ const TaxesTable: React.FC<TaxesTableProps> = ({
               <h1 className="text-2xl font-bold text-white">Tax Rates</h1>
               <p className="text-purple-100 mt-1">Manage your store tax rates and configurations</p>
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-purple-100">{t('show')}:</span>
-              <div className="relative">
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-                  className="appearance-none bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white border border-white/20 rounded-lg px-4 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50"
-                >
-                  <option value={5}>5</option>
-                  <option value={15}>15</option>
-                  <option value={20}>20</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/70 pointer-events-none" />
+            <div className="flex items-center space-x-3">
+              <button 
+                onClick={onAddNew}
+                className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all border border-white/20"
+              >
+                <Plus className="w-4 h-4" />
+                Add Tax
+              </button>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-purple-100">{t('show')}:</span>
+                <div className="relative">
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                    className="appearance-none bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white border border-white/20 rounded-lg px-4 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50"
+                  >
+                    <option value={5}>5</option>
+                    <option value={15}>15</option>
+                    <option value={20}>20</option>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/70 pointer-events-none" />
+                </div>
               </div>
             </div>
           </div>
